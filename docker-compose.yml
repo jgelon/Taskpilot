@@ -13,7 +13,7 @@ services:
       OIDC_CLIENT_ID: ${OIDC_CLIENT_ID}
       FRONTEND_URL: ${APP_URL}
     volumes:
-      - taskpilot-data:/data
+      - ./data:/data
     networks:
       - internal
       - authentik_backend
@@ -45,10 +45,6 @@ services:
       - "traefik.http.routers.taskpilot.tls.certresolver=letsencrypt"
       - "traefik.http.services.taskpilot.loadbalancer.server.port=80"
       - "traefik.docker.network=frontend"
-
-volumes:
-  taskpilot-data:
-    driver: local
 
 networks:
   internal:

@@ -31,15 +31,42 @@ app.use(cors({
 }));
 app.use(express.json());
 
-// ── JWKS client — fetches via internal URL to avoid Traefik round-trip ───────
-const jwks = jwksClient({
-  jwksUri: `${AUTHENTIK_INTERNAL_URL}/application/o/taskpilot/.well-known/jwks.json`,
-  cache: true,
-  cacheMaxEntries: 5,
-  cacheMaxAge: 600000 // 10 min
-});
+// ── JWKS client — URI is discovered from OpenID config at startup ────────────
+// Authentik's JWKS endpoint is /application/o/<slug>/jwks/
+// We discover the exact URI from the .well-known doc to be safe.
+let jwks;
+
+async function initJwks() {
+  const discoveryUrl = `${AUTHENTIK_INTERNAL_URL}/application/o/taskpilot/.well-known/openid-configuration`;
+  console.log('[JWKS] Fetching discovery doc from:', discoveryUrl);
+  try {
+    const res = await fetch(discoveryUrl);
+    if (!res.ok) throw new Error(`HTTP ${res.status} ${res.statusText}`);
+    const doc = await res.json();
+    const jwksUri = doc.jwks_uri;
+    console.log('[JWKS] Discovered jwks_uri:', jwksUri);
+    jwks = jwksClient({
+      jwksUri,
+      cache: true,
+      cacheMaxEntries: 5,
+      cacheMaxAge: 600000
+    });
+  } catch (err) {
+    console.error('[JWKS] Discovery failed:', err.message);
+    // Fall back to the conventional Authentik path
+    const fallback = `${AUTHENTIK_INTERNAL_URL}/application/o/taskpilot/jwks/`;
+    console.warn('[JWKS] Falling back to:', fallback);
+    jwks = jwksClient({
+      jwksUri: fallback,
+      cache: true,
+      cacheMaxEntries: 5,
+      cacheMaxAge: 600000
+    });
+  }
+}
 
 function getSigningKey(header, callback) {
+  if (!jwks) return callback(new Error('JWKS client not initialised yet'));
   jwks.getSigningKey(header.kid, (err, key) => {
     if (err) {
       console.error('[JWKS] Failed to get signing key:', err.message);
@@ -230,4 +257,10 @@ app.post('/tasks/suggest', requireAuth, (req, res) => {
 
 app.get('/health', (req, res) => res.json({ status: 'ok' }));
 
-app.listen(PORT, () => console.log(`TaskPilot API running on port ${PORT}`));
+// ── Boot ─────────────────────────────────────────────────────────────────────
+initJwks().then(() => {
+  app.listen(PORT, () => console.log(`TaskPilot API running on port ${PORT}`));
+}).catch(err => {
+  console.error('Fatal: could not initialise JWKS, starting anyway:', err.message);
+  app.listen(PORT, () => console.log(`TaskPilot API running on port ${PORT} (JWKS pending)`));
+});
