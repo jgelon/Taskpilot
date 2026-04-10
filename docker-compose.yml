@@ -9,12 +9,14 @@ services:
       PORT: 3010
       DATA_FILE: /data/tasks.json
       AUTHENTIK_URL: ${AUTHENTIK_URL}
+      AUTHENTIK_INTERNAL_URL: ${AUTHENTIK_INTERNAL_URL:-http://authentik-server:9000}
       OIDC_CLIENT_ID: ${OIDC_CLIENT_ID}
       FRONTEND_URL: ${APP_URL}
     volumes:
       - taskpilot-data:/data
     networks:
       - internal
+      - authentik_backend
     healthcheck:
       test: ["CMD", "wget", "-qO-", "http://localhost:3010/health"]
       interval: 15s
@@ -53,3 +55,7 @@ networks:
     driver: bridge
   frontend:
     external: true
+  authentik_backend:
+    external: true
+    name: authentik_authentik_backend
+

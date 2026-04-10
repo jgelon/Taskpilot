@@ -41,15 +41,17 @@ export class CreateTaskComponent {
         this.showToast('Task created!', 'success');
         setTimeout(() => this.done.emit(), 900);
       },
-      error: () => {
+      error: (err) => {
         this.loading = false;
-        this.showToast('Failed to create task', 'error');
+        const detail = err?.error?.detail || err?.error?.error || err?.message || err?.status;
+        this.showToast(`Error: ${detail || 'Failed to create task'}`, 'error');
+        console.error('Create task error:', err);
       }
     });
   }
 
   showToast(msg: string, type: string) {
     this.toast = { msg, type };
-    setTimeout(() => this.toast = null, 2500);
+    setTimeout(() => this.toast = null, type === 'error' ? 6000 : 2500);
   }
 }

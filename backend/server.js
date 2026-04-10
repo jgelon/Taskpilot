@@ -9,18 +9,31 @@ const jwt = require('jsonwebtoken');
 const app = express();
 const PORT = process.env.PORT || 3010;
 const DATA_FILE = process.env.DATA_FILE || '/data/tasks.json';
-const AUTHENTIK_URL = process.env.AUTHENTIK_URL; // e.g. https://auth.juse.nl
+const AUTHENTIK_URL = process.env.AUTHENTIK_URL; // public URL — used for issuer claim validation
+const AUTHENTIK_INTERNAL_URL = process.env.AUTHENTIK_INTERNAL_URL || AUTHENTIK_URL; // internal — used for JWKS fetch
 const OIDC_CLIENT_ID = process.env.OIDC_CLIENT_ID;
+const FRONTEND_URL = process.env.FRONTEND_URL;
+
+// ── Log config on startup so you can verify values in docker logs ────────────
+console.log('=== TaskPilot API starting ===');
+console.log('PORT              :', PORT);
+console.log('AUTHENTIK_URL     :', AUTHENTIK_URL);
+console.log('AUTHENTIK_INTERNAL:', AUTHENTIK_INTERNAL_URL);
+console.log('OIDC_CLIENT_ID    :', OIDC_CLIENT_ID);
+console.log('FRONTEND_URL      :', FRONTEND_URL);
+console.log('JWKS URI          :', `${AUTHENTIK_INTERNAL_URL}/application/o/taskpilot/.well-known/jwks.json`);
+console.log('Expected issuer   :', `${AUTHENTIK_URL}/application/o/taskpilot/`);
+console.log('==============================');
 
 app.use(cors({
-  origin: process.env.FRONTEND_URL || 'https://todo.juse.nl',
+  origin: FRONTEND_URL,
   credentials: true
 }));
 app.use(express.json());
 
-// ── JWKS client (fetches Authentik's public keys to verify tokens) ──────────
+// ── JWKS client — fetches via internal URL to avoid Traefik round-trip ───────
 const jwks = jwksClient({
-  jwksUri: `${AUTHENTIK_URL}/application/o/taskpilot/.well-known/jwks.json`,
+  jwksUri: `${AUTHENTIK_INTERNAL_URL}/application/o/taskpilot/.well-known/jwks.json`,
   cache: true,
   cacheMaxEntries: 5,
   cacheMaxAge: 600000 // 10 min
@@ -28,7 +41,10 @@ const jwks = jwksClient({
 
 function getSigningKey(header, callback) {
   jwks.getSigningKey(header.kid, (err, key) => {
-    if (err) return callback(err);
+    if (err) {
+      console.error('[JWKS] Failed to get signing key:', err.message);
+      return callback(err);
+    }
     callback(null, key.getPublicKey());
   });
 }
@@ -37,21 +53,30 @@ function getSigningKey(header, callback) {
 function requireAuth(req, res, next) {
   const authHeader = req.headers.authorization;
   if (!authHeader || !authHeader.startsWith('Bearer ')) {
+    console.warn('[AUTH] Request missing Bearer token:', req.method, req.path);
     return res.status(401).json({ error: 'Missing token' });
   }
   const token = authHeader.slice(7);
+
+  // Decode without verifying first, just to log what we received
+  const unverified = jwt.decode(token, { complete: true });
+  console.log('[AUTH] Verifying token — iss:', unverified?.payload?.iss, '| aud:', unverified?.payload?.aud, '| kid:', unverified?.header?.kid);
+
   jwt.verify(token, getSigningKey, {
     audience: OIDC_CLIENT_ID,
     issuer: `${AUTHENTIK_URL}/application/o/taskpilot/`,
     algorithms: ['RS256']
   }, (err, decoded) => {
-    if (err) return res.status(401).json({ error: 'Invalid token', detail: err.message });
-    // Attach user info to request
+    if (err) {
+      console.error('[AUTH] Token verification failed:', err.name, '-', err.message);
+      return res.status(401).json({ error: 'Invalid token', detail: err.message });
+    }
     req.user = {
       sub: decoded.sub,
       username: decoded.preferred_username || decoded.email || decoded.sub,
       name: decoded.name || decoded.preferred_username || 'Unknown'
     };
+    console.log('[AUTH] Verified user:', req.user.username);
     next();
   });
 }
