@@ -1,0 +1,50 @@
+.edit-task {
+  .edit-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 6px;
+  }
+
+  .added-info {
+    font-size: 12px;
+    color: var(--text-dim);
+    margin-bottom: 24px;
+  }
+}
+
+.task-form {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+  margin-bottom: 20px;
+}
+
+.form-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+}
+
+.edit-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  padding-top: 4px;
+  border-top: 1px solid var(--border);
+  margin-top: 8px;
+}
+
+.task-meta-info {
+  display: flex; flex-direction: column; gap: 4px;
+  margin-bottom: 24px;
+}
+
+.meta-line {
+  font-size: 12px; color: var(--text-dim);
+  display: flex; align-items: center; gap: 5px;
+  .meta-icon { font-size: 12px; }
+  strong { color: var(--text-muted); font-weight: 600; }
+}
+
+.closed-info { color: rgba(61,255,160,0.6); }

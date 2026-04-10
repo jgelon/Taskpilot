@@ -1,0 +1,78 @@
+<!-- OIDC config error — shown when Authentik is unreachable or misconfigured -->
+<div class="error-screen" *ngIf="auth.initError">
+  <div class="error-card">
+    <div class="error-icon">⚠️</div>
+    <h2>Authentication Error</h2>
+    <p class="error-msg">{{ auth.initError }}</p>
+    <div class="error-hints">
+      <p>Things to check:</p>
+      <ul>
+        <li>Is <code>AUTHENTIK_URL</code> correct in your <code>.env</code>?</li>
+        <li>Is Authentik running and reachable from this container?</li>
+        <li>Does the Authentik application slug match <strong>taskpilot</strong>?</li>
+        <li>Is <code>OIDC_CLIENT_ID</code> correct?</li>
+      </ul>
+    </div>
+    <button class="btn-primary" (click)="window.location.reload()">Retry</button>
+  </div>
+</div>
+
+<!-- Loading — shown while OIDC discovery is in progress -->
+<div class="loading-screen" *ngIf="!auth.initError && !auth.isLoggedIn">
+  <div class="loading-inner">
+    <div class="logo-symbol">◈</div>
+    <div class="loading-spinner"></div>
+    <p>Connecting to Authentik…</p>
+  </div>
+</div>
+
+<!-- App — only rendered once logged in -->
+<div class="app-shell" *ngIf="!auth.initError && auth.isLoggedIn">
+  <header class="app-header">
+    <button class="logo-btn" (click)="setView('home')">
+      <span class="logo-icon">◈</span>
+      <span class="logo-text">TaskPilot</span>
+    </button>
+    <div class="header-right">
+      <div class="user-chip">
+        <span class="user-avatar">{{ auth.userProfile.name.charAt(0).toUpperCase() }}</span>
+        <span class="user-name">{{ auth.userProfile.name }}</span>
+      </div>
+      <button class="logout-btn" (click)="auth.logout()" title="Sign out">⏻</button>
+    </div>
+  </header>
+
+  <main class="app-main">
+    <div class="home-view" *ngIf="currentView === 'home'">
+      <div class="home-hero">
+        <div class="hero-symbol">◈</div>
+        <h1 class="hero-title">Task<span class="accent">Pilot</span></h1>
+        <p class="hero-sub">Navigate your work, one task at a time.</p>
+      </div>
+      <div class="home-actions">
+        <button class="action-card action-create" (click)="setView('create')">
+          <span class="action-icon">＋</span>
+          <span class="action-label">Create Task</span>
+          <span class="action-desc">Add a new task to your pile</span>
+        </button>
+        <button class="action-card action-list" (click)="setView('list')">
+          <span class="action-icon">≡</span>
+          <span class="action-label">View Tasks</span>
+          <span class="action-desc">Browse and edit all tasks</span>
+        </button>
+        <button class="action-card action-get" (click)="setView('get')">
+          <span class="action-icon">⚡</span>
+          <span class="action-label">Get a Task</span>
+          <span class="action-desc">Find what to do right now</span>
+        </button>
+      </div>
+    </div>
+
+    <div class="view-container" *ngIf="currentView !== 'home'">
+      <button class="back-btn" (click)="setView('home')">← Back</button>
+      <app-create-task *ngIf="currentView === 'create'" (done)="setView('home')"></app-create-task>
+      <app-task-list *ngIf="currentView === 'list'"></app-task-list>
+      <app-get-task *ngIf="currentView === 'get'"></app-get-task>
+    </div>
+  </main>
+</div>

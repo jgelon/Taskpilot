@@ -1,0 +1,51 @@
+<div class="create-task">
+  <h2 class="section-title">New Task</h2>
+  <p class="subtitle">Add something to your pile</p>
+
+  <form class="task-form" (ngSubmit)="submit()">
+    <div class="form-group">
+      <label>Task Name *</label>
+      <input type="text" [(ngModel)]="name" name="name" placeholder="What needs to be done?" maxlength="120" />
+    </div>
+
+    <div class="form-group">
+      <label>Description</label>
+      <textarea [(ngModel)]="description" name="description" placeholder="Optional details..."></textarea>
+    </div>
+
+    <div class="form-row">
+      <div class="form-group">
+        <label>Duration (minutes) *</label>
+        <input type="number" [(ngModel)]="estimatedDuration" name="estimatedDuration" placeholder="e.g. 30" min="1" max="10000" />
+      </div>
+      <div class="form-group">
+        <label>Priority *</label>
+        <select [(ngModel)]="priority" name="priority">
+          <option [value]="1">1 — Critical</option>
+          <option [value]="2">2 — High</option>
+          <option [value]="3">3 — Medium</option>
+          <option [value]="4">4 — Low</option>
+        </select>
+      </div>
+    </div>
+
+    <div class="form-group">
+      <label>Due Date</label>
+      <input type="date" [(ngModel)]="dueDate" name="dueDate" />
+    </div>
+
+    <div class="priority-preview">
+      <span class="preview-label">Priority</span>
+      <span class="priority-badge p{{priority}}">P{{priority}}</span>
+      <span class="preview-text">
+        {{ priority === 1 ? 'Critical' : priority === 2 ? 'High' : priority === 3 ? 'Medium' : 'Low' }}
+      </span>
+    </div>
+
+    <button class="btn-primary" type="submit" [disabled]="!isValid || loading">
+      {{ loading ? 'Creating...' : 'Create Task' }}
+    </button>
+  </form>
+</div>
+
+<div class="toast" [class]="toast?.type" *ngIf="toast">{{ toast?.msg }}</div>

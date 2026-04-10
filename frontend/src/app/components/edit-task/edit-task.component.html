@@ -1,0 +1,77 @@
+<div class="edit-task">
+  <div class="edit-header">
+    <h2 class="section-title">Edit Task</h2>
+    <span class="status-badge" [class]="task.status">{{ task.status }}</span>
+  </div>
+
+  <div class="task-meta-info">
+    <span class="meta-line">
+      <span class="meta-icon">🗓</span> Added {{ formatDate(task.dateAdded) }}
+      <span *ngIf="task.createdByName"> by <strong>{{ task.createdByName }}</strong></span>
+    </span>
+    <span class="meta-line closed-info" *ngIf="task.status === 'closed' && task.closedByName">
+      <span class="meta-icon">✓</span> Closed {{ formatDate(task.closedAt!) }}
+      by <strong>{{ task.closedByName }}</strong>
+    </span>
+  </div>
+
+  <form class="task-form" (ngSubmit)="save()">
+    <div class="form-group">
+      <label>Task Name *</label>
+      <input type="text" [(ngModel)]="name" name="name" maxlength="120" />
+    </div>
+
+    <div class="form-group">
+      <label>Description</label>
+      <textarea [(ngModel)]="description" name="description" placeholder="Optional details..."></textarea>
+    </div>
+
+    <div class="form-row">
+      <div class="form-group">
+        <label>Duration (min) *</label>
+        <input type="number" [(ngModel)]="estimatedDuration" name="estimatedDuration" min="1" />
+      </div>
+      <div class="form-group">
+        <label>Priority *</label>
+        <select [(ngModel)]="priority" name="priority">
+          <option [value]="1">1 — Critical</option>
+          <option [value]="2">2 — High</option>
+          <option [value]="3">3 — Medium</option>
+          <option [value]="4">4 — Low</option>
+        </select>
+      </div>
+    </div>
+
+    <div class="form-row">
+      <div class="form-group">
+        <label>Due Date</label>
+        <input type="date" [(ngModel)]="dueDate" name="dueDate" />
+      </div>
+      <div class="form-group">
+        <label>Status</label>
+        <select [(ngModel)]="status" name="status">
+          <option value="open">Open</option>
+          <option value="closed">Closed</option>
+        </select>
+      </div>
+    </div>
+
+    <button class="btn-primary" type="submit" [disabled]="!isValid || loading">
+      {{ loading ? 'Saving…' : 'Save Changes' }}
+    </button>
+  </form>
+
+  <div class="edit-actions">
+    <button class="btn-success" (click)="closeTask()" *ngIf="task.status === 'open'" [disabled]="loading">
+      ✓ Mark Done
+    </button>
+    <button class="btn-secondary" (click)="cancel.emit()" [disabled]="loading">
+      Cancel
+    </button>
+    <button class="btn-danger" (click)="deleteTask()" [disabled]="loading">
+      {{ confirmDelete ? 'Confirm Delete' : '🗑 Delete' }}
+    </button>
+  </div>
+</div>
+
+<div class="toast" [class]="toast?.type" *ngIf="toast">{{ toast?.msg }}</div>

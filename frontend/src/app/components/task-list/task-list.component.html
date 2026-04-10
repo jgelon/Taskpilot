@@ -1,0 +1,66 @@
+<div class="task-list" *ngIf="!editingTask">
+  <div class="list-header">
+    <h2 class="section-title">Tasks</h2>
+    <div class="filter-tabs">
+      <button [class.active]="filterStatus === 'open'" (click)="filterStatus = 'open'">Open</button>
+      <button [class.active]="filterStatus === 'closed'" (click)="filterStatus = 'closed'">Done</button>
+      <button [class.active]="filterStatus === 'all'" (click)="filterStatus = 'all'">All</button>
+    </div>
+  </div>
+
+  <div class="loading-state" *ngIf="loading">
+    <div class="spinner"></div>
+    <span>Loading tasks…</span>
+  </div>
+
+  <div class="empty-state" *ngIf="!loading && filteredTasks.length === 0">
+    <div class="empty-icon">📭</div>
+    <div class="empty-text">
+      No {{ filterStatus === 'all' ? '' : filterStatus }} tasks yet.<br>
+      <span *ngIf="filterStatus === 'open'">Create one to get started!</span>
+    </div>
+  </div>
+
+  <div class="task-cards" *ngIf="!loading">
+    <div
+      class="task-card"
+      *ngFor="let task of filteredTasks"
+      [class.closed]="task.status === 'closed'"
+      [class.overdue]="isOverdue(task)"
+      (click)="openEdit(task)"
+    >
+      <div class="card-top">
+        <span class="priority-badge p{{task.priority}}">P{{task.priority}}</span>
+        <span class="task-name">{{ task.name }}</span>
+        <span class="status-badge" [class]="task.status">{{ task.status }}</span>
+      </div>
+
+      <div class="card-meta">
+        <span class="meta-item">
+          <span class="meta-icon">⏱</span> {{ task.estimatedDuration }}m
+        </span>
+        <span class="meta-item" *ngIf="task.dueDate" [class.overdue-text]="isOverdue(task)">
+          <span class="meta-icon">📅</span> {{ formatDate(task.dueDate) }}
+          <span class="overdue-badge" *ngIf="isOverdue(task)">Overdue</span>
+        </span>
+        <span class="meta-item user-tag" *ngIf="task.createdByName">
+          <span class="meta-icon">👤</span> {{ task.createdByName }}
+        </span>
+        <span class="meta-item closed-by" *ngIf="task.status === 'closed' && task.closedByName">
+          <span class="meta-icon">✓</span> {{ task.closedByName }}
+        </span>
+      </div>
+
+      <p class="task-desc" *ngIf="task.description">{{ task.description }}</p>
+    </div>
+  </div>
+</div>
+
+<app-edit-task
+  *ngIf="editingTask"
+  [task]="editingTask"
+  (done)="onEditDone()"
+  (cancel)="onEditCancel()"
+></app-edit-task>
+
+<div class="toast" [class]="toast!.type" *ngIf="toast">{{ toast!.msg }}</div>

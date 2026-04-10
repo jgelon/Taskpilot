@@ -1,0 +1,114 @@
+<div class="get-task">
+
+  <!-- INPUT STATE -->
+  <div class="step-input" *ngIf="state === 'input'">
+    <h2 class="section-title">Get a Task</h2>
+    <p class="subtitle">How much time do you have?</p>
+
+    <div class="presets">
+      <button
+        class="preset-btn"
+        *ngFor="let p of presets"
+        [class.active]="availableMinutes === p.value"
+        (click)="setPreset(p.value)"
+      >{{ p.label }}</button>
+    </div>
+
+    <div class="form-group custom-input">
+      <label>Or enter custom minutes</label>
+      <input
+        type="number"
+        [(ngModel)]="availableMinutes"
+        name="availableMinutes"
+        placeholder="e.g. 45"
+        min="1"
+      />
+    </div>
+
+    <button
+      class="btn-primary go-btn"
+      (click)="getSuggestion()"
+      [disabled]="!availableMinutes || availableMinutes <= 0 || loading"
+    >
+      <span *ngIf="!loading">⚡ Find a Task</span>
+      <span *ngIf="loading">Searching…</span>
+    </button>
+  </div>
+
+  <!-- NO TASK FOUND -->
+  <div class="step-none" *ngIf="state === 'none'">
+    <div class="empty-state">
+      <div class="empty-icon">🏖️</div>
+      <div class="empty-text">
+        No open tasks fit in {{ availableMinutes }} minutes.<br>
+        Try a longer time window or add shorter tasks!
+      </div>
+    </div>
+    <button class="btn-secondary" (click)="reset()">← Try Again</button>
+  </div>
+
+  <!-- SHOWING TASK -->
+  <div class="step-showing" *ngIf="state === 'showing' && currentTask">
+    <div class="suggestion-label">
+      <span class="pulse-dot"></span>
+      Suggested for you
+    </div>
+
+    <div class="task-spotlight">
+      <div class="spotlight-top">
+        <span class="priority-badge p{{currentTask.priority}}">P{{currentTask.priority}}</span>
+        <span class="priority-name">{{ priorityLabel(currentTask.priority) }}</span>
+      </div>
+
+      <h3 class="spotlight-name">{{ currentTask.name }}</h3>
+
+      <p class="spotlight-desc" *ngIf="currentTask.description">{{ currentTask.description }}</p>
+
+      <div class="spotlight-meta">
+        <div class="meta-chip">
+          <span>⏱</span> {{ currentTask.estimatedDuration }} min
+        </div>
+        <div class="meta-chip" *ngIf="currentTask.dueDate">
+          <span>📅</span> Due {{ formatDate(currentTask.dueDate) }}
+        </div>
+        <div class="meta-chip">
+          <span>🗓</span> Added {{ formatDate(currentTask.dateAdded) }}
+        </div>
+      </div>
+    </div>
+
+    <div class="action-row">
+      <button class="btn-primary accept-btn" (click)="acceptTask()">
+        ✓ Accept
+      </button>
+      <button class="btn-secondary decline-btn" (click)="declineTask()" [disabled]="loading">
+        {{ loading ? '…' : 'Skip →' }}
+      </button>
+    </div>
+  </div>
+
+  <!-- ACCEPT / FINISH STATE -->
+  <div class="step-accept" *ngIf="state === 'accept' && currentTask">
+    <div class="accept-header">
+      <div class="check-circle">✓</div>
+      <h2 class="section-title">Working on it!</h2>
+      <p class="subtitle">Did you finish <strong>{{ currentTask.name }}</strong>?</p>
+    </div>
+
+    <div class="finish-options">
+      <button class="finish-card finish-done" (click)="finishTask(true)" [disabled]="loading">
+        <span class="finish-icon">🎉</span>
+        <span class="finish-title">Yes, done!</span>
+        <span class="finish-desc">Close this task</span>
+      </button>
+      <button class="finish-card finish-keep" (click)="finishTask(false)" [disabled]="loading">
+        <span class="finish-icon">🔄</span>
+        <span class="finish-title">Not yet</span>
+        <span class="finish-desc">Keep it open</span>
+      </button>
+    </div>
+  </div>
+
+</div>
+
+<div class="toast" [class]="toast?.type" *ngIf="toast">{{ toast?.msg }}</div>
