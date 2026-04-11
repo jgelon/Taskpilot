@@ -263,3 +263,116 @@ async function start() {
 }
 
 start();
+
+// ── CSV Export ────────────────────────────────────────────────────────────────
+app.get('/tasks/export', requireAuth, (req, res) => {
+  const tasks = db.all('SELECT * FROM tasks ORDER BY dateAdded ASC').map(rowToTask);
+
+  const headers = [
+    'id','name','description','estimatedDuration','priority',
+    'dueDate','dateAdded','status','createdBy','createdByName',
+    'closedBy','closedByName','closedAt','recurring','recurrenceDays'
+  ];
+
+  const escape = v => {
+    if (v == null) return '';
+    const s = String(v);
+    return s.includes(',') || s.includes('"') || s.includes('\n')
+      ? `"${s.replace(/"/g, '""')}"` : s;
+  };
+
+  const lines = [
+    headers.join(','),
+    ...tasks.map(t => headers.map(h => escape(t[h])).join(','))
+  ];
+
+  res.setHeader('Content-Type', 'text/csv');
+  res.setHeader('Content-Disposition', `attachment; filename="taskpilot-export-${new Date().toISOString().substring(0,10)}.csv"`);
+  res.send(lines.join('\r\n'));
+});
+
+// ── CSV Import ────────────────────────────────────────────────────────────────
+app.post('/tasks/import', requireAuth, (req, res) => {
+  const { csv } = req.body;
+  if (!csv) return res.status(400).json({ error: 'No CSV data provided' });
+
+  const lines = csv.replace(/\r\n/g, '\n').replace(/\r/g, '\n').split('\n').filter(l => l.trim());
+  if (lines.length < 2) return res.status(400).json({ error: 'CSV must have a header row and at least one data row' });
+
+  // Parse CSV respecting quoted fields
+  function parseLine(line) {
+    const fields = [];
+    let cur = '', inQuote = false;
+    for (let i = 0; i < line.length; i++) {
+      const c = line[i];
+      if (inQuote) {
+        if (c === '"' && line[i+1] === '"') { cur += '"'; i++; }
+        else if (c === '"') inQuote = false;
+        else cur += c;
+      } else {
+        if (c === '"') inQuote = true;
+        else if (c === ',') { fields.push(cur); cur = ''; }
+        else cur += c;
+      }
+    }
+    fields.push(cur);
+    return fields;
+  }
+
+  const headers = parseLine(lines[0]).map(h => h.trim());
+  const required = ['name', 'estimatedDuration', 'priority'];
+  const missing = required.filter(r => !headers.includes(r));
+  if (missing.length) return res.status(400).json({ error: `Missing required columns: ${missing.join(', ')}` });
+
+  let created = 0, updated = 0, skipped = 0;
+  const errors = [];
+
+  for (let i = 1; i < lines.length; i++) {
+    if (!lines[i].trim()) continue;
+    try {
+      const vals = parseLine(lines[i]);
+      const row = {};
+      headers.forEach((h, idx) => row[h] = vals[idx]?.trim() ?? '');
+
+      if (!row.name) { skipped++; errors.push(`Row ${i+1}: missing name`); continue; }
+      const dur = Number(row.estimatedDuration);
+      const pri = Number(row.priority);
+      if (!dur || dur < 1) { skipped++; errors.push(`Row ${i+1}: invalid estimatedDuration`); continue; }
+      if (!pri || pri < 1 || pri > 4) { skipped++; errors.push(`Row ${i+1}: priority must be 1-4`); continue; }
+
+      const existing = row.id ? db.get('SELECT id FROM tasks WHERE id = ?', [row.id]) : null;
+
+      if (existing) {
+        db.run(
+          `UPDATE tasks SET name=?,description=?,estimatedDuration=?,priority=?,dueDate=?,
+           status=?,createdBy=?,createdByName=?,closedBy=?,closedByName=?,closedAt=?,
+           recurring=?,recurrenceDays=? WHERE id=?`,
+          [row.name, row.description||'', dur, pri,
+           row.dueDate||null, row.status||'open',
+           row.createdBy||null, row.createdByName||null,
+           row.closedBy||null, row.closedByName||null, row.closedAt||null,
+           row.recurring||'none', row.recurrenceDays ? Number(row.recurrenceDays) : null,
+           row.id]
+        );
+        updated++;
+      } else {
+        db.run(
+          `INSERT INTO tasks (id,name,description,estimatedDuration,priority,dueDate,dateAdded,
+           status,createdBy,createdByName,closedBy,closedByName,closedAt,recurring,recurrenceDays)
+           VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
+          [row.id || uuidv4(), row.name, row.description||'', dur, pri,
+           row.dueDate||null, row.dateAdded || new Date().toISOString(), row.status||'open',
+           row.createdBy || req.user.username, row.createdByName || req.user.name,
+           row.closedBy||null, row.closedByName||null, row.closedAt||null,
+           row.recurring||'none', row.recurrenceDays ? Number(row.recurrenceDays) : null]
+        );
+        created++;
+      }
+    } catch (err) {
+      skipped++;
+      errors.push(`Row ${i+1}: ${err.message}`);
+    }
+  }
+
+  res.json({ created, updated, skipped, errors });
+});

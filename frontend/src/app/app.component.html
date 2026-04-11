@@ -79,6 +79,13 @@
             <span class="action-desc">Find what to do right now</span>
           </div>
         </button>
+        <button class="action-card action-io" (click)="setView('importexport')">
+          <span class="action-icon">⇅</span>
+          <div class="action-text">
+            <span class="action-label">Import / Export</span>
+            <span class="action-desc">Back up or restore tasks via CSV</span>
+          </div>
+        </button>
       </div>
     </div>
 
@@ -87,6 +94,7 @@
       <app-create-task *ngIf="currentView === 'create'" (done)="setView('home')"></app-create-task>
       <app-task-list *ngIf="currentView === 'list'"></app-task-list>
       <app-get-task *ngIf="currentView === 'get'"></app-get-task>
+      <app-import-export *ngIf="currentView === 'importexport'" (done)="setView('home')"></app-import-export>
     </div>
   </main>
 </div>

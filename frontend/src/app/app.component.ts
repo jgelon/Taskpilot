@@ -9,12 +9,14 @@ import { OAuthService } from 'angular-oauth2-oidc';
 import { Subscription } from 'rxjs';
 import { filter } from 'rxjs/operators';
 
-type View = 'home' | 'create' | 'list' | 'get';
+import { ImportExportComponent } from './components/import-export/import-export.component';
+
+type View = 'home' | 'create' | 'list' | 'get' | 'importexport';
 
 @Component({
   selector: 'app-root',
   standalone: true,
-  imports: [CommonModule, CreateTaskComponent, TaskListComponent, GetTaskComponent],
+  imports: [CommonModule, CreateTaskComponent, TaskListComponent, GetTaskComponent, ImportExportComponent],
   templateUrl: './app.component.html',
   styleUrl: './app.component.scss'
 })

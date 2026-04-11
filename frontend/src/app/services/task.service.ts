@@ -92,4 +92,17 @@ export class TaskService {
       { headers: this.headers() }
     );
   }
+
+  exportCsv(): Observable<Blob> {
+    return this.http.get(`${this.api}/tasks/export`, {
+      headers: this.headers(),
+      responseType: 'blob'
+    });
+  }
+
+  importCsv(csv: string): Observable<{ created: number; updated: number; skipped: number; errors: string[] }> {
+    return this.http.post<{ created: number; updated: number; skipped: number; errors: string[] }>(
+      `${this.api}/tasks/import`, { csv }, { headers: this.headers() }
+    );
+  }
 }

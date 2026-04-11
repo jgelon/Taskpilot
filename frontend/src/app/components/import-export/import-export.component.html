@@ -1,0 +1,79 @@
+<div class="ie-container">
+  <h2 class="section-title">Import / Export</h2>
+  <p class="subtitle">Back up your tasks or move them between instances</p>
+
+  <!-- Export -->
+  <div class="ie-card">
+    <div class="ie-card-header">
+      <span class="ie-icon">⬇️</span>
+      <div>
+        <div class="ie-title">Export to CSV</div>
+        <div class="ie-desc">Download all tasks including IDs, status and user info</div>
+      </div>
+    </div>
+    <button class="btn-primary" (click)="exportCsv()" [disabled]="exportLoading">
+      {{ exportLoading ? 'Exporting…' : 'Download CSV' }}
+    </button>
+  </div>
+
+  <!-- Import -->
+  <div class="ie-card">
+    <div class="ie-card-header">
+      <span class="ie-icon">⬆️</span>
+      <div>
+        <div class="ie-title">Import from CSV</div>
+        <div class="ie-desc">Existing IDs update the task — new or missing IDs create a new task</div>
+      </div>
+    </div>
+
+    <!-- Idle / drop zone -->
+    <div
+      class="drop-zone"
+      *ngIf="importState === 'idle'"
+      [class.drag-over]="dragOver"
+      (dragover)="onDragOver($event)"
+      (dragleave)="onDragLeave()"
+      (drop)="onDrop($event)"
+      (click)="fileInput.click()"
+    >
+      <span class="drop-icon">📂</span>
+      <span class="drop-text">Drop a CSV file here, or <strong>tap to browse</strong></span>
+      <input #fileInput type="file" accept=".csv" (change)="onFileSelected($event)" hidden />
+    </div>
+
+    <!-- Loading -->
+    <div class="import-loading" *ngIf="importState === 'loading'">
+      <div class="spinner"></div>
+      <span>Importing…</span>
+    </div>
+
+    <!-- Result -->
+    <div class="import-result" *ngIf="importState === 'result' && importResult">
+      <div class="result-row">
+        <span class="result-chip created">✚ {{ importResult.created }} created</span>
+        <span class="result-chip updated">✎ {{ importResult.updated }} updated</span>
+        <span class="result-chip skipped" *ngIf="importResult.skipped > 0">⚠ {{ importResult.skipped }} skipped</span>
+      </div>
+      <div class="result-errors" *ngIf="importResult.errors.length > 0">
+        <p class="errors-title">Skipped rows:</p>
+        <ul>
+          <li *ngFor="let e of importResult.errors">{{ e }}</li>
+        </ul>
+      </div>
+      <div class="result-actions">
+        <button class="btn-secondary" (click)="reset()">Import another</button>
+        <button class="btn-primary" (click)="done.emit()">Done</button>
+      </div>
+    </div>
+
+    <!-- Error -->
+    <div class="import-error" *ngIf="importError">⚠ {{ importError }}</div>
+  </div>
+
+  <!-- CSV format hint -->
+  <div class="format-hint">
+    <p class="hint-title">Expected CSV columns</p>
+    <code class="hint-code">id, name, description, estimatedDuration, priority, dueDate, dateAdded, status, createdBy, createdByName, closedBy, closedByName, closedAt, recurring, recurrenceDays</code>
+    <p class="hint-note">Only <strong>name</strong>, <strong>estimatedDuration</strong> and <strong>priority</strong> are required. Use the export to get a correctly formatted file.</p>
+  </div>
+</div>
