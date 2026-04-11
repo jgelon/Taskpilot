@@ -1,0 +1,87 @@
+<div class="settings-overlay" (click)="close.emit()"></div>
+<div class="settings-panel">
+  <div class="settings-header">
+    <h2 class="settings-title">Settings</h2>
+    <button class="close-btn" (click)="close.emit()">✕</button>
+  </div>
+
+  <div class="settings-tabs">
+    <button [class.active]="tab === 'categories'" (click)="tab = 'categories'">🏷 Categories</button>
+    <button [class.active]="tab === 'importexport'" (click)="tab = 'importexport'">⇅ Import / Export</button>
+  </div>
+
+  <!-- Categories tab -->
+  <div class="tab-content" *ngIf="tab === 'categories'">
+    <div class="loading-state" *ngIf="loading">
+      <div class="spinner"></div><span>Loading…</span>
+    </div>
+
+    <!-- Category list -->
+    <div class="category-list" *ngIf="!loading">
+      <div class="empty-state" *ngIf="categories.length === 0">
+        <div class="empty-icon">🏷</div>
+        <div class="empty-text">No categories yet. Add one below.</div>
+      </div>
+
+      <div class="category-row" *ngFor="let cat of categories">
+        <!-- View mode -->
+        <ng-container *ngIf="editingId !== cat.id">
+          <span class="cat-dot" [style.background]="cat.color"></span>
+          <span class="cat-name">{{ cat.name }}</span>
+          <div class="cat-actions">
+            <button class="icon-btn" (click)="startEdit(cat)" title="Edit">✎</button>
+            <button class="icon-btn danger" (click)="deleteCategory(cat.id)"
+              [class.confirm]="confirmDeleteId === cat.id">
+              {{ confirmDeleteId === cat.id ? 'Sure?' : '🗑' }}
+            </button>
+          </div>
+        </ng-container>
+
+        <!-- Edit mode -->
+        <ng-container *ngIf="editingId === cat.id">
+          <div class="edit-row">
+            <input class="cat-input" [(ngModel)]="editName" name="editName" maxlength="40" />
+            <div class="color-swatches">
+              <button *ngFor="let c of PRESET_COLORS" class="swatch"
+                [style.background]="c" [class.selected]="editColor === c"
+                (click)="editColor = c"></button>
+              <input type="color" [(ngModel)]="editColor" name="editColor" class="color-picker" title="Custom color" />
+            </div>
+            <div class="edit-row-actions">
+              <button class="btn-success" (click)="saveEdit()" [disabled]="editLoading">
+                {{ editLoading ? '…' : 'Save' }}
+              </button>
+              <button class="btn-secondary" (click)="cancelEdit()">Cancel</button>
+            </div>
+          </div>
+        </ng-container>
+      </div>
+    </div>
+
+    <!-- Add new -->
+    <div class="add-category">
+      <p class="add-title">Add category</p>
+      <div class="add-form">
+        <input class="cat-input" [(ngModel)]="newName" name="newName"
+          placeholder="Category name" maxlength="40"
+          (keydown.enter)="addCategory()" />
+        <div class="color-swatches">
+          <button *ngFor="let c of PRESET_COLORS" class="swatch"
+            [style.background]="c" [class.selected]="newColor === c"
+            (click)="newColor = c"></button>
+          <input type="color" [(ngModel)]="newColor" name="newColor" class="color-picker" title="Custom color" />
+        </div>
+        <button class="btn-primary" (click)="addCategory()" [disabled]="!newName.trim() || addLoading">
+          {{ addLoading ? '…' : '+ Add' }}
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Import/Export tab -->
+  <div class="tab-content ie-tab" *ngIf="tab === 'importexport'">
+    <app-import-export (done)="close.emit()"></app-import-export>
+  </div>
+</div>
+
+<div class="toast" [class]="toast?.type" *ngIf="toast">{{ toast?.msg }}</div>

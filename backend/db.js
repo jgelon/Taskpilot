@@ -6,13 +6,12 @@ const DB_FILE = process.env.DATA_FILE || '/data/tasks.db';
 
 let db;
 
-// Persist db to disk
 function save() {
   const data = db.export();
   const buf = Buffer.from(data);
   const tmp = DB_FILE + '.tmp';
   fs.writeFileSync(tmp, buf);
-  fs.renameSync(tmp, DB_FILE); // atomic replace
+  fs.renameSync(tmp, DB_FILE);
 }
 
 async function init() {
@@ -30,6 +29,14 @@ async function init() {
   }
 
   db.run(`
+    CREATE TABLE IF NOT EXISTS categories (
+      id TEXT PRIMARY KEY,
+      name TEXT NOT NULL UNIQUE,
+      color TEXT NOT NULL DEFAULT '#7b61ff'
+    )
+  `);
+
+  db.run(`
     CREATE TABLE IF NOT EXISTS tasks (
       id TEXT PRIMARY KEY,
       name TEXT NOT NULL,
@@ -44,10 +51,18 @@ async function init() {
       closedBy TEXT,
       closedByName TEXT,
       closedAt TEXT,
-      recurring TEXT,
-      recurrenceDays INTEGER
+      recurring TEXT DEFAULT 'none',
+      recurrenceDays INTEGER,
+      categoryId TEXT REFERENCES categories(id) ON DELETE SET NULL
     )
   `);
+
+  // Migration: add categoryId column if upgrading from older schema
+  try {
+    db.run('ALTER TABLE tasks ADD COLUMN categoryId TEXT REFERENCES categories(id) ON DELETE SET NULL');
+    console.log('[DB] Migrated: added categoryId column');
+  } catch (_) { /* already exists */ }
+
   save();
 }
 
@@ -61,8 +76,7 @@ function all(sql, params = []) {
 }
 
 function get(sql, params = []) {
-  const rows = all(sql, params);
-  return rows[0] || null;
+  return all(sql, params)[0] || null;
 }
 
 function run(sql, params = []) {

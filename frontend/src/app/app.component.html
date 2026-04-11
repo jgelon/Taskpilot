@@ -35,7 +35,8 @@
         <span class="user-avatar">{{ auth.userProfile.name.charAt(0).toUpperCase() }}</span>
         <span class="user-name">{{ auth.userProfile.name }}</span>
       </div>
-      <button class="logout-btn" (click)="auth.logout()" title="Sign out">⏻</button>
+      <button class="icon-header-btn" (click)="settingsOpen = true" title="Settings">⚙</button>
+      <button class="icon-header-btn logout" (click)="auth.logout()" title="Sign out">⏻</button>
     </div>
   </header>
 
@@ -47,7 +48,6 @@
         <p class="hero-sub">Navigate your work, one task at a time.</p>
       </div>
 
-      <!-- Overdue notification -->
       <div class="overdue-banner" *ngIf="stats && stats.overdue > 0" (click)="setView('list')">
         <span class="overdue-icon">⚠️</span>
         <span class="overdue-text">
@@ -79,13 +79,6 @@
             <span class="action-desc">Find what to do right now</span>
           </div>
         </button>
-        <button class="action-card action-io" (click)="setView('importexport')">
-          <span class="action-icon">⇅</span>
-          <div class="action-text">
-            <span class="action-label">Import / Export</span>
-            <span class="action-desc">Back up or restore tasks via CSV</span>
-          </div>
-        </button>
       </div>
     </div>
 
@@ -94,7 +87,9 @@
       <app-create-task *ngIf="currentView === 'create'" (done)="setView('home')"></app-create-task>
       <app-task-list *ngIf="currentView === 'list'"></app-task-list>
       <app-get-task *ngIf="currentView === 'get'"></app-get-task>
-      <app-import-export *ngIf="currentView === 'importexport'" (done)="setView('home')"></app-import-export>
     </div>
   </main>
+
+  <!-- Settings slide-over -->
+  <app-settings *ngIf="settingsOpen" (close)="settingsOpen = false"></app-settings>
 </div>

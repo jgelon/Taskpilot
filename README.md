@@ -42,10 +42,10 @@ All configuration lives in a single `.env` file next to `docker-compose.yml`.
 
 | Variable | Description | Example |
 |---|---|---|
-| `APP_URL` | Full public URL of the app. Used for OIDC redirect URI and CORS. | `https://tasks.your-domain.com` |
-| `APP_DOMAIN` | Hostname only, no scheme. Used by Traefik's `Host()` routing rule. | `tasks.your-domain.com` |
-| `AUTHENTIK_URL` | Public Authentik URL. Used by the browser for login and for token issuer validation. | `https://auth.your-domain.com` |
-| `AUTHENTIK_INTERNAL_URL` | Internal Authentik URL for backend JWKS key fetch, bypassing Traefik. Defaults to `http://authentik-server:9000`. | `http://authentik-server:9000` |
+| `APP_URL` | Full public URL. Used for OIDC redirect URI and CORS. | `https://tasks.your-domain.com` |
+| `APP_DOMAIN` | Hostname only. Used by Traefik's `Host()` rule. | `tasks.your-domain.com` |
+| `AUTHENTIK_URL` | Public Authentik URL. Used for browser login and token issuer validation. | `https://auth.your-domain.com` |
+| `AUTHENTIK_INTERNAL_URL` | Internal Authentik URL for backend JWKS fetch (bypasses Traefik). | `http://authentik-server:9000` |
 | `OIDC_CLIENT_ID` | Client ID from your Authentik OIDC application. | `abc123xyz` |
 
 ---
@@ -57,16 +57,15 @@ Browser / Mobile
       │  HTTPS
       ▼
 ┌─────────────────────┐
-│  Traefik            │  ← routes tasks.your-domain.com → frontend
-│  (external)         │
+│  Traefik (external) │  ← routes your domain → frontend
 └──────────┬──────────┘
            │ HTTP :80
            ▼
 ┌─────────────────────┐
 │  Nginx (frontend)   │  ← serves Angular SPA
-│  /api/* → proxy     │  ← proxies API calls to backend
+│  /api/* → proxy     │  ← proxies API to backend
 └──────────┬──────────┘
-           │ HTTP :3010 (internal only)
+           │ HTTP :3010 (internal)
            ▼
 ┌─────────────────────┐     ┌──────────────────────┐
 │  Node.js API        │────▶│  Authentik           │
@@ -79,60 +78,36 @@ Browser / Mobile
 └─────────────────────┘
 ```
 
-**Key points:**
-- The API is never exposed publicly — Nginx proxies `/api/*` internally
-- The API joins `authentik_authentik_backend` to fetch JWKS keys directly
-- JWKS URI is auto-discovered from Authentik's OpenID configuration at startup
-- Data is stored in `./data/tasks.db` (SQLite) on the host filesystem
-
----
-
-## Data Storage
-
-Tasks are stored in `./data/tasks.db` (SQLite) relative to `docker-compose.yml`. The `data/` folder is created automatically on first run.
-
-### Migrating from JSON (upgrading from an older version)
-
-If you have existing data in `./data/tasks.json`, run the migration before starting:
-
-```bash
-# Build first so the image exists
-docker compose build
-
-# Run the migration script
-docker run --rm \
-  -v $(pwd)/data:/data \
-  -w /app \
-  --entrypoint node \
-  taskpilot-api migrate-json-to-sqlite.js
-
-# Then start normally
-docker compose up -d
-```
-
-The original `tasks.json` is kept untouched — delete it manually once you're happy.
-
-### Backup
-
-```bash
-cp ./data/tasks.db ./data/tasks.backup.$(date +%Y%m%d).db
-```
-
 ---
 
 ## Features
 
 | Feature | Description |
 |---|---|
-| ➕ Create Task | Name, description (optional), duration, priority 1–4, due date (optional), recurring schedule. |
-| 📋 View Tasks | Filter by open/closed/all. Sort by date, priority, due date, name, or duration. Shows overdue indicator and who closed each task. |
-| ⚡ Get a Task | Enter available time → get best-fit task. Accept or skip; mark done or keep open. |
-| ✏️ Edit Task | Change any field including recurrence. Mark done, reopen, or delete. |
-| 🔁 Recurring Tasks | Tasks automatically reappear after being closed. Supports daily, weekly, monthly, or a custom day interval. |
-| ⚠️ Overdue Banner | Home screen shows a warning with the count of overdue tasks when any exist. |
-| 🔢 Open Count | Home screen shows the number of open tasks on the View Tasks button. |
-| 🔐 Authentication | OIDC login via Authentik. All API calls require a valid token. |
-| 👤 User Tracking | Tasks record `createdBy` and `closedBy` with timestamps, visible in the edit view. |
+| ➕ Create Task | Name, description, duration, priority 1–4, due date, category, recurring schedule |
+| 📋 View Tasks | Filter by status, category chips, sort by any field with ↑↓ toggle |
+| ⚡ Get a Task | Enter available time → best-fit task suggestion with accept/skip flow |
+| ✏️ Edit Task | Change any field including category and recurrence. Mark done, reopen, delete. |
+| 🏷 Categories | Color-coded categories with full add/edit/delete management in Settings |
+| 🔁 Recurring Tasks | Auto-reopens with shifted due date on close. Daily/weekly/monthly/custom. |
+| ⚠️ Overdue Banner | Home screen warning with count of overdue tasks, taps to filtered list |
+| 🔢 Open Count | Open task count badge on the View Tasks home button |
+| ⚙️ Settings Panel | Slide-over panel (gear icon, top-right) for category management and import/export |
+| ⇅ Import / Export | Export all tasks to CSV (with IDs). Import CSV with upsert-by-ID logic. |
+| 🔐 Authentication | OIDC login via Authentik. All API calls require a valid Bearer token. |
+| 👤 User Tracking | Tasks record `createdBy` and `closedBy` with timestamps (visible in edit view) |
+
+---
+
+## Categories
+
+Categories are managed from the **Settings** panel (⚙ gear icon in the top-right header).
+
+- Add a category with a name and colour (preset swatches or custom colour picker)
+- Edit name and colour at any time
+- Delete a category — tasks are unassigned (not deleted)
+- Filter the task list by category using the chip bar below the status filter
+- Category is shown as a coloured badge on each task card
 
 ---
 
@@ -147,9 +122,20 @@ cp ./data/tasks.db ./data/tasks.backup.$(date +%Y%m%d).db
 
 ---
 
+## Get a Task — Sorting Algorithm
+
+1. **Urgent first** — due within 30 days, sorted soonest first
+2. **Priority** — P1 before P4 for non-urgent tasks
+3. **Due date within priority** — tasks with a due date rank above those without
+4. **Age** — oldest added task wins as tiebreaker
+
+Skipped tasks are excluded for the remainder of that session.
+
+---
+
 ## Recurring Tasks
 
-When a recurring task is marked as done, a new open copy is automatically scheduled with a due date shifted forward by the recurrence interval. The interval is based on the task's current due date (or today if none is set).
+When a recurring task is closed, a new open copy is created with the due date shifted forward.
 
 | Option | Interval |
 |---|---|
@@ -160,36 +146,51 @@ When a recurring task is marked as done, a new open copy is automatically schedu
 
 ---
 
-## Get a Task — Sorting Algorithm
+## Data Storage
 
-Given your available time, open tasks that fit are sorted by:
+Tasks are stored in `./data/tasks.db` (SQLite) next to `docker-compose.yml`.
 
-1. **Urgent first** — tasks due within 30 days are prioritised above all others, sorted by due date (soonest first)
-2. **Priority** — for non-urgent tasks, P1 beats P2 beats P3 beats P4
-3. **Due date within priority** — tasks with a due date rank above tasks without; sooner dates rank higher
-4. **Age** — oldest added task wins as a final tiebreaker
+### Migrating from JSON (older versions)
 
-Skipped tasks are excluded for the rest of that session.
+```bash
+docker compose build
+docker run --rm -v $(pwd)/data:/data -w /app --entrypoint node taskpilot-api migrate-json-to-sqlite.js
+docker compose up -d
+```
+
+### Backup
+
+```bash
+cp ./data/tasks.db ./data/tasks.backup.$(date +%Y%m%d).db
+```
 
 ---
 
 ## API Endpoints
 
-All endpoints require `Authorization: Bearer <token>` except `/health`.
+All require `Authorization: Bearer <token>` except `/health`.
 
 | Method | Path | Description |
 |---|---|---|
-| `GET` | `/tasks?status=open&sort=priority&order=asc` | List tasks with optional filter and sort |
-| `POST` | `/tasks` | Create a task |
-| `PUT` | `/tasks/:id` | Update a task |
-| `DELETE` | `/tasks/:id` | Delete a task |
-| `GET` | `/tasks/stats` | Get overdue and open task counts |
-| `POST` | `/tasks/suggest` | Get best task for available time |
+| `GET` | `/categories` | List all categories |
+| `POST` | `/categories` | Create category |
+| `PUT` | `/categories/:id` | Update category |
+| `DELETE` | `/categories/:id` | Delete category (tasks unassigned) |
+| `GET` | `/tasks?status=open&sort=priority&order=asc&categoryId=<id>` | List tasks |
+| `POST` | `/tasks` | Create task |
+| `PUT` | `/tasks/:id` | Update task |
+| `DELETE` | `/tasks/:id` | Delete task |
+| `GET` | `/tasks/stats` | Overdue + open counts |
+| `POST` | `/tasks/suggest` | Best task for available time |
+| `GET` | `/tasks/export` | Download CSV |
+| `POST` | `/tasks/import` | Upload CSV (upsert by ID) |
 | `GET` | `/health` | Health check |
 
-### Sort options
-`sort` can be: `dateAdded`, `priority`, `dueDate`, `name`, `estimatedDuration`  
-`order` can be: `asc`, `desc`
+### Task filter params
+- `status`: `open` · `closed` · `all`
+- `sort`: `dateAdded` · `priority` · `dueDate` · `name` · `estimatedDuration`
+- `order`: `asc` · `desc`
+- `categoryId`: category UUID, or `none` for uncategorised tasks
 
 ---
 
@@ -197,30 +198,26 @@ All endpoints require `Authorization: Bearer <token>` except `/health`.
 
 | Network | Type | Purpose |
 |---|---|---|
-| `internal` | internal bridge | Communication between frontend and api |
-| `frontend` | external | Traefik routes traffic to the frontend container |
-| `authentik_authentik_backend` | external | API fetches JWKS keys directly from Authentik |
+| `internal` | bridge | Frontend ↔ API communication |
+| `frontend` | external | Traefik → frontend routing |
+| `authentik_authentik_backend` | external | API → Authentik JWKS fetch |
 
 ---
 
 ## Development (without Docker)
 
-**Backend:**
 ```bash
-cd backend
-npm install
+# Backend
+cd backend && npm install
 export AUTHENTIK_URL=https://auth.your-domain.com
 export AUTHENTIK_INTERNAL_URL=http://authentik-server:9000
 export OIDC_CLIENT_ID=your-client-id
 export FRONTEND_URL=http://localhost:4200
 export DATA_FILE=./data/tasks.db
 node server.js
-```
 
-**Frontend:**
-```bash
-cd frontend
-npm install
-# Edit src/environments/environment.ts with your values
+# Frontend
+cd frontend && npm install
+# Edit src/environments/environment.ts
 ng serve
 ```

@@ -1,18 +1,15 @@
 <div class="create-task">
   <h2 class="section-title">New Task</h2>
   <p class="subtitle">Add something to your pile</p>
-
   <form class="task-form" (ngSubmit)="submit()">
     <div class="form-group">
       <label>Task Name *</label>
       <input type="text" [(ngModel)]="name" name="name" placeholder="What needs to be done?" maxlength="120" />
     </div>
-
     <div class="form-group">
       <label>Description</label>
       <textarea [(ngModel)]="description" name="description" placeholder="Optional details..."></textarea>
     </div>
-
     <div class="form-row">
       <div class="form-group">
         <label>Duration (minutes) *</label>
@@ -28,12 +25,19 @@
         </select>
       </div>
     </div>
-
-    <div class="form-group">
-      <label>Due Date</label>
-      <input type="date" [(ngModel)]="dueDate" name="dueDate" />
+    <div class="form-row">
+      <div class="form-group">
+        <label>Due Date</label>
+        <input type="date" [(ngModel)]="dueDate" name="dueDate" />
+      </div>
+      <div class="form-group">
+        <label>Category</label>
+        <select [(ngModel)]="categoryId" name="categoryId">
+          <option [ngValue]="null">No category</option>
+          <option *ngFor="let c of categories" [ngValue]="c.id">{{ c.name }}</option>
+        </select>
+      </div>
     </div>
-
     <div class="form-group">
       <label>Recurring</label>
       <select [(ngModel)]="recurring" name="recurring">
@@ -44,12 +48,10 @@
         <option value="custom">Custom interval</option>
       </select>
     </div>
-
     <div class="form-group" *ngIf="recurring === 'custom'">
       <label>Repeat every (days)</label>
       <input type="number" [(ngModel)]="recurrenceDays" name="recurrenceDays" placeholder="e.g. 14" min="1" />
     </div>
-
     <div class="priority-preview">
       <span class="preview-label">Priority</span>
       <span class="priority-badge p{{priority}}">P{{priority}}</span>
@@ -58,11 +60,9 @@
         · Repeats {{ recurring === 'custom' ? 'every ' + (recurrenceDays || '?') + ' days' : recurring }}
       </span>
     </div>
-
     <button class="btn-primary" type="submit" [disabled]="!isValid || loading">
       {{ loading ? 'Creating...' : 'Create Task' }}
     </button>
   </form>
 </div>
-
 <div class="toast" [class]="toast?.type" *ngIf="toast">{{ toast?.msg }}</div>
