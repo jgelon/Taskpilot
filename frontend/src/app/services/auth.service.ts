@@ -5,6 +5,7 @@ import { environment } from '../../environments/environment';
 @Injectable({ providedIn: 'root' })
 export class AuthService {
   initError: string | null = null;
+  private _isAdmin = false;
 
   constructor(private oauthService: OAuthService) {}
 
@@ -28,11 +29,30 @@ export class AuthService {
     } catch (err: any) {
       console.error('OIDC init failed:', err);
       this.initError = `Could not reach Authentik at ${environment.authentikUrl}. Check AUTHENTIK_URL in your .env and that Authentik is reachable. (${err?.message ?? err})`;
-      return; // Don't block — let the app render the error screen
+      return;
     }
 
     if (!this.oauthService.hasValidAccessToken()) {
       this.oauthService.initCodeFlow();
+      return;
+    }
+
+    // Fetch role from backend /me endpoint
+    await this.fetchRole();
+  }
+
+  private async fetchRole(): Promise<void> {
+    try {
+      const res = await fetch(`${environment.apiUrl}/me`, {
+        headers: { Authorization: `Bearer ${this.accessToken}` }
+      });
+      if (res.ok) {
+        const data = await res.json();
+        this._isAdmin = !!data.isAdmin;
+        console.log('[Auth] isAdmin:', this._isAdmin);
+      }
+    } catch (e) {
+      console.warn('[Auth] Could not fetch /me:', e);
     }
   }
 
@@ -42,6 +62,10 @@ export class AuthService {
 
   get accessToken(): string {
     return this.oauthService.getAccessToken();
+  }
+
+  get isAdmin(): boolean {
+    return this._isAdmin;
   }
 
   get userProfile(): { username: string; name: string; email: string } {

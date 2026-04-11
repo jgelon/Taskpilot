@@ -35,7 +35,7 @@
         <span class="user-avatar">{{ auth.userProfile.name.charAt(0).toUpperCase() }}</span>
         <span class="user-name">{{ auth.userProfile.name }}</span>
       </div>
-      <button class="icon-header-btn" (click)="settingsOpen = true" title="Settings">⚙</button>
+      <button class="icon-header-btn" *ngIf="auth.isAdmin" (click)="settingsOpen = true" title="Settings">⚙</button>
       <button class="icon-header-btn logout" (click)="auth.logout()" title="Sign out">⏻</button>
     </div>
   </header>
@@ -91,5 +91,5 @@
   </main>
 
   <!-- Settings slide-over -->
-  <app-settings *ngIf="settingsOpen" (close)="settingsOpen = false"></app-settings>
+  <app-settings *ngIf="settingsOpen" [isAdmin]="auth.isAdmin" (close)="settingsOpen = false"></app-settings>
 </div>

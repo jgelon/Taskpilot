@@ -11,6 +11,7 @@ const AUTHENTIK_URL = process.env.AUTHENTIK_URL;
 const AUTHENTIK_INTERNAL_URL = process.env.AUTHENTIK_INTERNAL_URL || AUTHENTIK_URL;
 const OIDC_CLIENT_ID = process.env.OIDC_CLIENT_ID;
 const FRONTEND_URL = process.env.FRONTEND_URL;
+const ADMIN_GROUP = process.env.ADMIN_GROUP || 'taskpilot-admin';
 
 console.log('=== TaskPilot API starting ===');
 console.log('PORT              :', PORT);
@@ -18,6 +19,7 @@ console.log('AUTHENTIK_URL     :', AUTHENTIK_URL);
 console.log('AUTHENTIK_INTERNAL:', AUTHENTIK_INTERNAL_URL);
 console.log('OIDC_CLIENT_ID    :', OIDC_CLIENT_ID);
 console.log('FRONTEND_URL      :', FRONTEND_URL);
+console.log('ADMIN_GROUP       :', ADMIN_GROUP);
 console.log('==============================');
 
 app.use(cors({ origin: FRONTEND_URL, credentials: true }));
@@ -68,13 +70,26 @@ function requireAuth(req, res, next) {
       console.error('[AUTH] Failed:', err.name, '-', err.message);
       return res.status(401).json({ error: 'Invalid token', detail: err.message });
     }
+    const groups = Array.isArray(decoded.groups) ? decoded.groups : [];
     req.user = {
       sub: decoded.sub,
       username: decoded.preferred_username || decoded.email || decoded.sub,
-      name: decoded.name || decoded.preferred_username || 'Unknown'
+      name: decoded.name || decoded.preferred_username || 'Unknown',
+      groups,
+      isAdmin: groups.includes(ADMIN_GROUP)
     };
+    console.log('[AUTH] Verified:', req.user.username, '| groups:', groups.join(', ') || 'none', '| admin:', req.user.isAdmin);
     next();
   });
+}
+
+// Only members of ADMIN_GROUP may proceed
+function requireAdmin(req, res, next) {
+  if (!req.user?.isAdmin) {
+    console.warn('[AUTH] Admin required, denied for:', req.user?.username);
+    return res.status(403).json({ error: 'Forbidden', detail: `Requires membership of the '${ADMIN_GROUP}' group` });
+  }
+  next();
 }
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
@@ -106,12 +121,22 @@ function scheduleNextRecurrence(task) {
   console.log(`[RECUR] Scheduled next "${task.name}" for ${nextDue}`);
 }
 
-// ── Category Routes ───────────────────────────────────────────────────────────
+// ── User info ─────────────────────────────────────────────────────────────────
+app.get('/me', requireAuth, (req, res) => {
+  res.json({
+    username: req.user.username,
+    name: req.user.name,
+    groups: req.user.groups,
+    isAdmin: req.user.isAdmin
+  });
+});
+
+// ── Category Routes (GET: all users; mutate: admin only) ──────────────────────
 app.get('/categories', requireAuth, (req, res) => {
   res.json(db.all('SELECT * FROM categories ORDER BY name ASC'));
 });
 
-app.post('/categories', requireAuth, (req, res) => {
+app.post('/categories', requireAuth, requireAdmin, (req, res) => {
   const { name, color } = req.body;
   if (!name?.trim()) return res.status(400).json({ error: 'name is required' });
   const id = uuidv4();
@@ -124,7 +149,7 @@ app.post('/categories', requireAuth, (req, res) => {
   }
 });
 
-app.put('/categories/:id', requireAuth, (req, res) => {
+app.put('/categories/:id', requireAuth, requireAdmin, (req, res) => {
   const cat = db.get('SELECT * FROM categories WHERE id = ?', [req.params.id]);
   if (!cat) return res.status(404).json({ error: 'Category not found' });
   const { name, color } = req.body;
@@ -137,7 +162,7 @@ app.put('/categories/:id', requireAuth, (req, res) => {
   }
 });
 
-app.delete('/categories/:id', requireAuth, (req, res) => {
+app.delete('/categories/:id', requireAuth, requireAdmin, (req, res) => {
   if (!db.get('SELECT id FROM categories WHERE id = ?', [req.params.id]))
     return res.status(404).json({ error: 'Category not found' });
   db.run('DELETE FROM categories WHERE id = ?', [req.params.id]);
@@ -272,8 +297,8 @@ app.post('/tasks/suggest', requireAuth, (req, res) => {
   res.json({ task: candidates[0] });
 });
 
-// ── CSV Export ────────────────────────────────────────────────────────────────
-app.get('/tasks/export', requireAuth, (req, res) => {
+// ── CSV Export (admin only) ───────────────────────────────────────────────────
+app.get('/tasks/export', requireAuth, requireAdmin, (req, res) => {
   const tasks = db.all(
     `SELECT t.*, c.name as categoryName FROM tasks t LEFT JOIN categories c ON t.categoryId = c.id ORDER BY t.dateAdded ASC`
   ).map(rowToTask);
@@ -291,8 +316,8 @@ app.get('/tasks/export', requireAuth, (req, res) => {
   res.send(lines.join('\r\n'));
 });
 
-// ── CSV Import ────────────────────────────────────────────────────────────────
-app.post('/tasks/import', requireAuth, (req, res) => {
+// ── CSV Import (admin only) ───────────────────────────────────────────────────
+app.post('/tasks/import', requireAuth, requireAdmin, (req, res) => {
   const { csv } = req.body;
   if (!csv) return res.status(400).json({ error: 'No CSV data provided' });
   const lines = csv.replace(/\r\n/g,'\n').replace(/\r/g,'\n').split('\n').filter(l => l.trim());

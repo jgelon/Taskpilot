@@ -5,6 +5,15 @@
     <button class="close-btn" (click)="close.emit()">✕</button>
   </div>
 
+  <!-- Access denied (non-admin somehow opened panel) -->
+  <div class="access-denied" *ngIf="!isAdmin">
+    <div class="denied-icon">🔒</div>
+    <p class="denied-title">Admin access required</p>
+    <p class="denied-desc">Settings are only available to members of the <code>taskpilot-admin</code> group in Authentik.</p>
+    <button class="btn-secondary" (click)="close.emit()">Close</button>
+  </div>
+
+  <ng-container *ngIf="isAdmin">
   <div class="settings-tabs">
     <button [class.active]="tab === 'categories'" (click)="tab = 'categories'">🏷 Categories</button>
     <button [class.active]="tab === 'importexport'" (click)="tab = 'importexport'">⇅ Import / Export</button>
@@ -82,6 +91,7 @@
   <div class="tab-content ie-tab" *ngIf="tab === 'importexport'">
     <app-import-export (done)="close.emit()"></app-import-export>
   </div>
+  </ng-container>
 </div>
 
 <div class="toast" [class]="toast?.type" *ngIf="toast">{{ toast?.msg }}</div>

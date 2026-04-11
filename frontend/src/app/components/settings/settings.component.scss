@@ -137,3 +137,24 @@
   &:focus { border-color: var(--accent); }
   &::placeholder { color: var(--text-dim); }
 }
+
+/* Access denied */
+.access-denied {
+  display: flex; flex-direction: column; align-items: center;
+  gap: 12px; padding: 48px 24px; text-align: center;
+}
+
+.denied-icon { font-size: 40px; opacity: 0.6; }
+
+.denied-title {
+  font-family: var(--font-head); font-size: 17px; font-weight: 700; color: var(--text);
+}
+
+.denied-desc {
+  font-size: 13px; color: var(--text-muted); line-height: 1.6;
+  code {
+    background: var(--surface2); border: 1px solid var(--border);
+    border-radius: 4px; padding: 1px 6px;
+    font-size: 12px; color: var(--accent); font-family: monospace;
+  }
+}

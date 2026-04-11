@@ -21,12 +21,39 @@ cp .env.example .env
 
 ### 2. Set up Authentik
 
+#### Create the OIDC application
+
 In Authentik → **Applications** → **Create**:
 - **Provider type**: OAuth2/OIDC
 - **Client type**: Confidential
 - **Redirect URI**: `https://your-app-domain.com/`  ← trailing slash required
 - **Scopes**: `openid`, `profile`, `email`
 - Copy the **Client ID** into your `.env`
+
+#### Add the groups claim
+
+By default Authentik does not include group membership in the token. You need to add a property mapping:
+
+1. Go to **Customisation → Property Mappings → Create → Scope Mapping**
+2. Fill in:
+   - **Name**: `groups`
+   - **Scope name**: `groups`
+   - **Expression**:
+     ```python
+     return list(request.user.ak_groups.values_list("name", flat=True))
+     ```
+3. Go to your TaskPilot **Provider → Edit → Advanced protocol settings**
+4. Under **Scopes**, add the `groups` mapping you just created
+5. Add `groups` to the **Scope string** field: `openid profile email groups`
+
+#### Create groups and assign users
+
+In Authentik → **Directory → Groups**:
+
+1. Create group `taskpilot-admin`
+2. Add your admin users to this group
+
+Regular users (not in any group) can still log in and use tasks — only Settings (categories, import/export) requires group membership.
 
 ### 3. Run
 
@@ -47,6 +74,23 @@ All configuration lives in a single `.env` file next to `docker-compose.yml`.
 | `AUTHENTIK_URL` | Public Authentik URL. Used for browser login and token issuer validation. | `https://auth.your-domain.com` |
 | `AUTHENTIK_INTERNAL_URL` | Internal Authentik URL for backend JWKS fetch (bypasses Traefik). | `http://authentik-server:9000` |
 | `OIDC_CLIENT_ID` | Client ID from your Authentik OIDC application. | `abc123xyz` |
+| `ADMIN_GROUP` | Authentik group name that grants Settings access. Default: `taskpilot-admin`. | `taskpilot-admin` |
+
+---
+
+## Access Control
+
+| Feature | Any logged-in user | `taskpilot-admin` group |
+|---|---|---|
+| View tasks | ✅ | ✅ |
+| Create / edit / close tasks | ✅ | ✅ |
+| Get a task suggestion | ✅ | ✅ |
+| See category names on tasks | ✅ | ✅ |
+| Manage categories | ❌ | ✅ |
+| Import / Export CSV | ❌ | ✅ |
+| Settings panel (⚙ icon) | Hidden | ✅ |
+
+The backend enforces all restrictions independently of the frontend — a non-admin attempting a protected API call will receive `403 Forbidden` even if they bypass the UI.
 
 ---
 
@@ -85,29 +129,18 @@ Browser / Mobile
 | Feature | Description |
 |---|---|
 | ➕ Create Task | Name, description, duration, priority 1–4, due date, category, recurring schedule |
-| 📋 View Tasks | Filter by status, category chips, sort by any field with ↑↓ toggle |
-| ⚡ Get a Task | Enter available time → best-fit task suggestion with accept/skip flow |
+| 📋 View Tasks | Filter by status and category, sort by any field with ↑↓ toggle |
+| ⚡ Get a Task | Enter available time → best-fit task with accept/skip/done/keep-open flow |
 | ✏️ Edit Task | Change any field including category and recurrence. Mark done, reopen, delete. |
-| 🏷 Categories | Color-coded categories with full add/edit/delete management in Settings |
+| 🏷 Categories | Color-coded, managed in Settings (admin only). Filter chips in task list. |
 | 🔁 Recurring Tasks | Auto-reopens with shifted due date on close. Daily/weekly/monthly/custom. |
-| ⚠️ Overdue Banner | Home screen warning with count of overdue tasks, taps to filtered list |
-| 🔢 Open Count | Open task count badge on the View Tasks home button |
-| ⚙️ Settings Panel | Slide-over panel (gear icon, top-right) for category management and import/export |
-| ⇅ Import / Export | Export all tasks to CSV (with IDs). Import CSV with upsert-by-ID logic. |
+| ⚠️ Overdue Banner | Home screen warning with count of overdue tasks |
+| 🔢 Open Count | Open task count badge on View Tasks home button |
+| ⚙️ Settings Panel | Slide-over (gear icon, top-right, admin only): category management + import/export |
+| ⇅ Import / Export | Export all tasks to CSV with IDs. Import with upsert-by-ID logic. (admin only) |
 | 🔐 Authentication | OIDC login via Authentik. All API calls require a valid Bearer token. |
+| 👥 Role-based access | `taskpilot-admin` group gates Settings. Enforced on both frontend and backend. |
 | 👤 User Tracking | Tasks record `createdBy` and `closedBy` with timestamps (visible in edit view) |
-
----
-
-## Categories
-
-Categories are managed from the **Settings** panel (⚙ gear icon in the top-right header).
-
-- Add a category with a name and colour (preset swatches or custom colour picker)
-- Edit name and colour at any time
-- Delete a category — tasks are unassigned (not deleted)
-- Filter the task list by category using the chip bar below the status filter
-- Category is shown as a coloured badge on each task card
 
 ---
 
@@ -148,7 +181,7 @@ When a recurring task is closed, a new open copy is created with the due date sh
 
 ## Data Storage
 
-Tasks are stored in `./data/tasks.db` (SQLite) next to `docker-compose.yml`.
+Tasks are stored in `./data/tasks.db` (SQLite) next to `docker-compose.yml`. The `data/` folder is created automatically on first run.
 
 ### Migrating from JSON (older versions)
 
@@ -168,29 +201,24 @@ cp ./data/tasks.db ./data/tasks.backup.$(date +%Y%m%d).db
 
 ## API Endpoints
 
-All require `Authorization: Bearer <token>` except `/health`.
+All require `Authorization: Bearer <token>` except `/health`. Routes marked 🔒 also require `taskpilot-admin` group membership.
 
-| Method | Path | Description |
-|---|---|---|
-| `GET` | `/categories` | List all categories |
-| `POST` | `/categories` | Create category |
-| `PUT` | `/categories/:id` | Update category |
-| `DELETE` | `/categories/:id` | Delete category (tasks unassigned) |
-| `GET` | `/tasks?status=open&sort=priority&order=asc&categoryId=<id>` | List tasks |
-| `POST` | `/tasks` | Create task |
-| `PUT` | `/tasks/:id` | Update task |
-| `DELETE` | `/tasks/:id` | Delete task |
-| `GET` | `/tasks/stats` | Overdue + open counts |
-| `POST` | `/tasks/suggest` | Best task for available time |
-| `GET` | `/tasks/export` | Download CSV |
-| `POST` | `/tasks/import` | Upload CSV (upsert by ID) |
-| `GET` | `/health` | Health check |
-
-### Task filter params
-- `status`: `open` · `closed` · `all`
-- `sort`: `dateAdded` · `priority` · `dueDate` · `name` · `estimatedDuration`
-- `order`: `asc` · `desc`
-- `categoryId`: category UUID, or `none` for uncategorised tasks
+| Method | Path | Auth | Description |
+|---|---|---|---|
+| `GET` | `/me` | user | Current user info + isAdmin flag |
+| `GET` | `/categories` | user | List all categories |
+| `POST` | `/categories` | 🔒 admin | Create category |
+| `PUT` | `/categories/:id` | 🔒 admin | Update category |
+| `DELETE` | `/categories/:id` | 🔒 admin | Delete category |
+| `GET` | `/tasks` | user | List tasks (filterable + sortable) |
+| `POST` | `/tasks` | user | Create task |
+| `PUT` | `/tasks/:id` | user | Update task |
+| `DELETE` | `/tasks/:id` | user | Delete task |
+| `GET` | `/tasks/stats` | user | Overdue + open counts |
+| `POST` | `/tasks/suggest` | user | Best task for available time |
+| `GET` | `/tasks/export` | 🔒 admin | Download CSV |
+| `POST` | `/tasks/import` | 🔒 admin | Upload CSV (upsert by ID) |
+| `GET` | `/health` | none | Health check |
 
 ---
 
@@ -212,6 +240,7 @@ cd backend && npm install
 export AUTHENTIK_URL=https://auth.your-domain.com
 export AUTHENTIK_INTERNAL_URL=http://authentik-server:9000
 export OIDC_CLIENT_ID=your-client-id
+export ADMIN_GROUP=taskpilot-admin
 export FRONTEND_URL=http://localhost:4200
 export DATA_FILE=./data/tasks.db
 node server.js

@@ -12,6 +12,7 @@ services:
       AUTHENTIK_INTERNAL_URL: ${AUTHENTIK_INTERNAL_URL:-http://authentik-server:9000}
       OIDC_CLIENT_ID: ${OIDC_CLIENT_ID}
       FRONTEND_URL: ${APP_URL}
+      ADMIN_GROUP: ${ADMIN_GROUP:-taskpilot-admin}
     volumes:
       - ./data:/data
     networks:

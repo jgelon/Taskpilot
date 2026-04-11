@@ -1,4 +1,4 @@
-import { Component, OnInit, Output, EventEmitter } from '@angular/core';
+import { Component, OnInit, Output, EventEmitter, Input } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { TaskService, Category } from '../../services/task.service';
@@ -15,6 +15,7 @@ type SettingsTab = 'categories' | 'importexport';
 })
 export class SettingsComponent implements OnInit {
   @Output() close = new EventEmitter<void>();
+  @Input() isAdmin = false;
 
   tab: SettingsTab = 'categories';
   categories: Category[] = [];
