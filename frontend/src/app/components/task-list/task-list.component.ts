@@ -1,12 +1,13 @@
 import { Component, OnInit } from '@angular/core';
 import { CommonModule } from '@angular/common';
-import { TaskService, Task } from '../../services/task.service';
+import { FormsModule } from '@angular/forms';
+import { TaskService, Task, SortField, SortOrder } from '../../services/task.service';
 import { EditTaskComponent } from '../edit-task/edit-task.component';
 
 @Component({
   selector: 'app-task-list',
   standalone: true,
-  imports: [CommonModule, EditTaskComponent],
+  imports: [CommonModule, FormsModule, EditTaskComponent],
   templateUrl: './task-list.component.html',
   styleUrl: './task-list.component.scss'
 })
@@ -14,8 +15,18 @@ export class TaskListComponent implements OnInit {
   tasks: Task[] = [];
   loading = true;
   editingTask: Task | null = null;
-  filterStatus: 'all' | 'open' | 'closed' = 'open';
+  filterStatus: 'open' | 'closed' | 'all' = 'open';
+  sortField: SortField = 'dateAdded';
+  sortOrder: SortOrder = 'desc';
   toast: { msg: string; type: string } | null = null;
+
+  sortOptions: { value: SortField; label: string }[] = [
+    { value: 'dateAdded', label: 'Date added' },
+    { value: 'priority', label: 'Priority' },
+    { value: 'dueDate', label: 'Due date' },
+    { value: 'name', label: 'Name' },
+    { value: 'estimatedDuration', label: 'Duration' },
+  ];
 
   constructor(private taskService: TaskService) {}
 
@@ -23,36 +34,28 @@ export class TaskListComponent implements OnInit {
 
   loadTasks() {
     this.loading = true;
-    this.taskService.getTasks().subscribe({
-      next: tasks => {
-        this.tasks = tasks.sort((a, b) =>
-          new Date(b.dateAdded).getTime() - new Date(a.dateAdded).getTime()
-        );
-        this.loading = false;
-      },
-      error: () => {
-        this.loading = false;
-        this.showToast('Failed to load tasks', 'error');
-      }
+    this.taskService.getTasks(this.filterStatus, this.sortField, this.sortOrder).subscribe({
+      next: tasks => { this.tasks = tasks; this.loading = false; },
+      error: () => { this.loading = false; this.showToast('Failed to load tasks', 'error'); }
     });
   }
 
-  get filteredTasks() {
-    if (this.filterStatus === 'all') return this.tasks;
-    return this.tasks.filter(t => t.status === this.filterStatus);
-  }
+  onFilterChange() { this.loadTasks(); }
+  onSortChange() { this.loadTasks(); }
 
-  openEdit(task: Task) { this.editingTask = { ...task }; }
-
-  onEditDone() {
-    this.editingTask = null;
+  toggleOrder() {
+    this.sortOrder = this.sortOrder === 'asc' ? 'desc' : 'asc';
     this.loadTasks();
   }
 
+  openEdit(task: Task) { this.editingTask = { ...task }; }
+  onEditDone() { this.editingTask = null; this.loadTasks(); }
   onEditCancel() { this.editingTask = null; }
 
-  priorityLabel(p: number) {
-    return ['', 'Critical', 'High', 'Medium', 'Low'][p] || '';
+  recurLabel(task: Task): string | null {
+    if (!task.recurring || task.recurring === 'none') return null;
+    if (task.recurring === 'custom') return `Every ${task.recurrenceDays}d`;
+    return task.recurring.charAt(0).toUpperCase() + task.recurring.slice(1);
   }
 
   formatDate(d: string | null) {

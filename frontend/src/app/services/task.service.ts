@@ -1,5 +1,5 @@
 import { Injectable } from '@angular/core';
-import { HttpClient, HttpHeaders } from '@angular/common/http';
+import { HttpClient, HttpHeaders, HttpParams } from '@angular/common/http';
 import { Observable } from 'rxjs';
 import { environment } from '../../environments/environment';
 import { AuthService } from './auth.service';
@@ -18,6 +18,13 @@ export interface Task {
   closedBy: string | null;
   closedByName: string | null;
   closedAt: string | null;
+  recurring: 'none' | 'daily' | 'weekly' | 'monthly' | 'custom';
+  recurrenceDays: number | null;
+}
+
+export interface TaskStats {
+  overdue: number;
+  open: number;
 }
 
 export interface CreateTaskDto {
@@ -26,6 +33,8 @@ export interface CreateTaskDto {
   estimatedDuration: number;
   priority: number;
   dueDate?: string | null;
+  recurring?: string;
+  recurrenceDays?: number | null;
 }
 
 export interface UpdateTaskDto {
@@ -35,7 +44,12 @@ export interface UpdateTaskDto {
   priority?: number;
   dueDate?: string | null;
   status?: 'open' | 'closed';
+  recurring?: string;
+  recurrenceDays?: number | null;
 }
+
+export type SortField = 'dateAdded' | 'priority' | 'dueDate' | 'name' | 'estimatedDuration';
+export type SortOrder = 'asc' | 'desc';
 
 @Injectable({ providedIn: 'root' })
 export class TaskService {
@@ -47,8 +61,16 @@ export class TaskService {
     return new HttpHeaders({ Authorization: `Bearer ${this.auth.accessToken}` });
   }
 
-  getTasks(): Observable<Task[]> {
-    return this.http.get<Task[]>(`${this.api}/tasks`, { headers: this.headers() });
+  getTasks(status?: string, sort?: SortField, order?: SortOrder): Observable<Task[]> {
+    let params = new HttpParams();
+    if (status) params = params.set('status', status);
+    if (sort) params = params.set('sort', sort);
+    if (order) params = params.set('order', order);
+    return this.http.get<Task[]>(`${this.api}/tasks`, { headers: this.headers(), params });
+  }
+
+  getStats(): Observable<TaskStats> {
+    return this.http.get<TaskStats>(`${this.api}/tasks/stats`, { headers: this.headers() });
   }
 
   createTask(dto: CreateTaskDto): Observable<Task> {

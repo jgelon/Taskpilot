@@ -1,4 +1,3 @@
-<!-- OIDC config error — shown when Authentik is unreachable or misconfigured -->
 <div class="error-screen" *ngIf="auth.initError">
   <div class="error-card">
     <div class="error-icon">⚠️</div>
@@ -17,7 +16,6 @@
   </div>
 </div>
 
-<!-- Loading — shown while OIDC discovery is in progress -->
 <div class="loading-screen" *ngIf="!auth.initError && !auth.isLoggedIn">
   <div class="loading-inner">
     <div class="logo-symbol">◈</div>
@@ -26,7 +24,6 @@
   </div>
 </div>
 
-<!-- App — only rendered once logged in -->
 <div class="app-shell" *ngIf="!auth.initError && auth.isLoggedIn">
   <header class="app-header">
     <button class="logo-btn" (click)="setView('home')">
@@ -49,21 +46,38 @@
         <h1 class="hero-title">Task<span class="accent">Pilot</span></h1>
         <p class="hero-sub">Navigate your work, one task at a time.</p>
       </div>
+
+      <!-- Overdue notification -->
+      <div class="overdue-banner" *ngIf="stats && stats.overdue > 0" (click)="setView('list')">
+        <span class="overdue-icon">⚠️</span>
+        <span class="overdue-text">
+          <strong>{{ stats.overdue }}</strong> overdue {{ stats.overdue === 1 ? 'task' : 'tasks' }}
+        </span>
+        <span class="overdue-cta">View →</span>
+      </div>
+
       <div class="home-actions">
         <button class="action-card action-create" (click)="setView('create')">
           <span class="action-icon">＋</span>
-          <span class="action-label">Create Task</span>
-          <span class="action-desc">Add a new task to your pile</span>
+          <div class="action-text">
+            <span class="action-label">Create Task</span>
+            <span class="action-desc">Add a new task to your pile</span>
+          </div>
         </button>
         <button class="action-card action-list" (click)="setView('list')">
           <span class="action-icon">≡</span>
-          <span class="action-label">View Tasks</span>
-          <span class="action-desc">Browse and edit all tasks</span>
+          <div class="action-text">
+            <span class="action-label">View Tasks</span>
+            <span class="action-desc">Browse and edit all tasks</span>
+          </div>
+          <span class="open-count" *ngIf="stats && stats.open > 0">{{ stats.open }}</span>
         </button>
         <button class="action-card action-get" (click)="setView('get')">
           <span class="action-icon">⚡</span>
-          <span class="action-label">Get a Task</span>
-          <span class="action-desc">Find what to do right now</span>
+          <div class="action-text">
+            <span class="action-label">Get a Task</span>
+            <span class="action-desc">Find what to do right now</span>
+          </div>
         </button>
       </div>
     </div>

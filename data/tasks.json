@@ -7,11 +7,11 @@
     "priority": 2,
     "dueDate": null,
     "dateAdded": "2026-04-10T23:13:14.813Z",
-    "status": "open",
+    "status": "closed",
     "createdBy": "jurn",
     "createdByName": "Jurn",
-    "closedBy": null,
-    "closedByName": null,
-    "closedAt": null
+    "closedBy": "jurn",
+    "closedByName": "Jurn",
+    "closedAt": "2026-04-11T10:35:28.632Z"
   }
 ]

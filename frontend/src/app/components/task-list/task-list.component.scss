@@ -137,3 +137,36 @@
 
 .user-tag { color: var(--accent2); }
 .closed-by { color: var(--success); }
+
+.controls {
+  display: flex; align-items: center; justify-content: space-between;
+  gap: 10px; margin-bottom: 16px; flex-wrap: wrap;
+}
+
+.sort-controls {
+  display: flex; align-items: center; gap: 6px;
+}
+
+.sort-select {
+  background: var(--surface2); border: 1.5px solid var(--border);
+  border-radius: var(--radius-sm); padding: 7px 10px;
+  color: var(--text); font-size: 13px; font-family: var(--font-body);
+  outline: none;
+  &:focus { border-color: var(--accent); }
+}
+
+.order-btn {
+  width: 34px; height: 34px;
+  background: var(--surface2); border: 1.5px solid var(--border);
+  border-radius: var(--radius-sm); color: var(--text-muted);
+  font-size: 16px; display: flex; align-items: center; justify-content: center;
+  transition: color 0.2s, border-color 0.2s;
+  &:hover { color: var(--accent); border-color: var(--accent); }
+}
+
+.recur-badge {
+  font-size: 11px; font-weight: 600;
+  background: rgba(123,97,255,0.12); color: var(--accent2);
+  border-radius: 20px; padding: 2px 8px;
+  white-space: nowrap;
+}

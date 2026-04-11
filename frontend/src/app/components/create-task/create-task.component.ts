@@ -18,13 +18,15 @@ export class CreateTaskComponent {
   estimatedDuration: number | null = null;
   priority: number = 2;
   dueDate = '';
+  recurring = 'none';
+  recurrenceDays: number | null = null;
   loading = false;
   toast: { msg: string; type: string } | null = null;
 
   constructor(private taskService: TaskService) {}
 
   get isValid() {
-    return this.name.trim() && this.estimatedDuration && this.estimatedDuration > 0 && this.priority >= 1 && this.priority <= 4;
+    return this.name.trim() && this.estimatedDuration && this.estimatedDuration > 0;
   }
 
   submit() {
@@ -35,7 +37,9 @@ export class CreateTaskComponent {
       description: this.description.trim() || undefined,
       estimatedDuration: this.estimatedDuration!,
       priority: this.priority,
-      dueDate: this.dueDate || null
+      dueDate: this.dueDate || null,
+      recurring: this.recurring,
+      recurrenceDays: this.recurring === 'custom' ? this.recurrenceDays : null
     }).subscribe({
       next: () => {
         this.showToast('Task created!', 'success');
@@ -45,7 +49,6 @@ export class CreateTaskComponent {
         this.loading = false;
         const detail = err?.error?.detail || err?.error?.error || err?.message || err?.status;
         this.showToast(`Error: ${detail || 'Failed to create task'}`, 'error');
-        console.error('Create task error:', err);
       }
     });
   }

@@ -115,6 +115,7 @@ input, textarea, select { font-family: inherit; }
   background: var(--surface2); border: 1.5px solid var(--border);
   padding: 12px 20px; border-radius: 50px; font-size: 14px; font-weight: 500;
   z-index: 1000; white-space: nowrap; box-shadow: 0 8px 32px rgba(0,0,0,0.4);
+  max-width: calc(100vw - 40px); white-space: normal; text-align: center;
   &.success { border-color: rgba(200,241,53,0.3); color: var(--accent); }
   &.error { border-color: rgba(255,92,92,0.3); color: var(--danger); }
   animation: toast-in 0.3s ease;

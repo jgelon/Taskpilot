@@ -7,7 +7,7 @@ services:
     restart: unless-stopped
     environment:
       PORT: 3010
-      DATA_FILE: /data/tasks.json
+      DATA_FILE: /data/tasks.db
       AUTHENTIK_URL: ${AUTHENTIK_URL}
       AUTHENTIK_INTERNAL_URL: ${AUTHENTIK_INTERNAL_URL:-http://authentik-server:9000}
       OIDC_CLIENT_ID: ${OIDC_CLIENT_ID}

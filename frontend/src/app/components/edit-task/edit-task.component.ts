@@ -21,6 +21,8 @@ export class EditTaskComponent implements OnInit {
   priority: number = 2;
   dueDate = '';
   status: 'open' | 'closed' = 'open';
+  recurring = 'none';
+  recurrenceDays: number | null = null;
 
   loading = false;
   confirmDelete = false;
@@ -35,11 +37,11 @@ export class EditTaskComponent implements OnInit {
     this.priority = this.task.priority;
     this.dueDate = this.task.dueDate ? this.task.dueDate.substring(0, 10) : '';
     this.status = this.task.status;
+    this.recurring = this.task.recurring || 'none';
+    this.recurrenceDays = this.task.recurrenceDays;
   }
 
-  get isValid() {
-    return this.name.trim() && this.estimatedDuration > 0;
-  }
+  get isValid() { return this.name.trim() && this.estimatedDuration > 0; }
 
   save() {
     if (!this.isValid || this.loading) return;
@@ -50,33 +52,23 @@ export class EditTaskComponent implements OnInit {
       estimatedDuration: this.estimatedDuration,
       priority: this.priority,
       dueDate: this.dueDate || null,
-      status: this.status
+      status: this.status,
+      recurring: this.recurring,
+      recurrenceDays: this.recurring === 'custom' ? this.recurrenceDays : null
     }).subscribe({
-      next: () => {
-        this.showToast('Task updated!', 'success');
-        setTimeout(() => this.done.emit(), 800);
-      },
-      error: () => {
-        this.loading = false;
-        this.showToast('Failed to save', 'error');
-      }
+      next: () => { this.showToast('Task updated!', 'success'); setTimeout(() => this.done.emit(), 800); },
+      error: () => { this.loading = false; this.showToast('Failed to save', 'error'); }
     });
   }
 
-  closeTask() {
-    this.status = 'closed';
-    this.save();
-  }
+  closeTask() { this.status = 'closed'; this.save(); }
 
   deleteTask() {
     if (!this.confirmDelete) { this.confirmDelete = true; return; }
     this.loading = true;
     this.taskService.deleteTask(this.task.id).subscribe({
       next: () => this.done.emit(),
-      error: () => {
-        this.loading = false;
-        this.showToast('Failed to delete', 'error');
-      }
+      error: () => { this.loading = false; this.showToast('Failed to delete', 'error'); }
     });
   }
 
@@ -85,7 +77,8 @@ export class EditTaskComponent implements OnInit {
     setTimeout(() => this.toast = null, 2500);
   }
 
-  formatDate(d: string) {
+  formatDate(d: string | null) {
+    if (!d) return null;
     return new Date(d).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' });
   }
 }

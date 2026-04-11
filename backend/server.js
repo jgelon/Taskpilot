@@ -1,39 +1,29 @@
 const express = require('express');
 const cors = require('cors');
 const { v4: uuidv4 } = require('uuid');
-const fs = require('fs');
-const path = require('path');
 const jwksClient = require('jwks-rsa');
 const jwt = require('jsonwebtoken');
+const db = require('./db');
 
 const app = express();
 const PORT = process.env.PORT || 3010;
-const DATA_FILE = process.env.DATA_FILE || '/data/tasks.json';
-const AUTHENTIK_URL = process.env.AUTHENTIK_URL; // public URL — used for issuer claim validation
-const AUTHENTIK_INTERNAL_URL = process.env.AUTHENTIK_INTERNAL_URL || AUTHENTIK_URL; // internal — used for JWKS fetch
+const AUTHENTIK_URL = process.env.AUTHENTIK_URL;
+const AUTHENTIK_INTERNAL_URL = process.env.AUTHENTIK_INTERNAL_URL || AUTHENTIK_URL;
 const OIDC_CLIENT_ID = process.env.OIDC_CLIENT_ID;
 const FRONTEND_URL = process.env.FRONTEND_URL;
 
-// ── Log config on startup so you can verify values in docker logs ────────────
 console.log('=== TaskPilot API starting ===');
 console.log('PORT              :', PORT);
 console.log('AUTHENTIK_URL     :', AUTHENTIK_URL);
 console.log('AUTHENTIK_INTERNAL:', AUTHENTIK_INTERNAL_URL);
 console.log('OIDC_CLIENT_ID    :', OIDC_CLIENT_ID);
 console.log('FRONTEND_URL      :', FRONTEND_URL);
-console.log('JWKS URI          :', `${AUTHENTIK_INTERNAL_URL}/application/o/taskpilot/.well-known/jwks.json`);
-console.log('Expected issuer   :', `${AUTHENTIK_URL}/application/o/taskpilot/`);
 console.log('==============================');
 
-app.use(cors({
-  origin: FRONTEND_URL,
-  credentials: true
-}));
+app.use(cors({ origin: FRONTEND_URL, credentials: true }));
 app.use(express.json());
 
-// ── JWKS client — URI is discovered from OpenID config at startup ────────────
-// Authentik's JWKS endpoint is /application/o/<slug>/jwks/
-// We discover the exact URI from the .well-known doc to be safe.
+// ── JWKS ─────────────────────────────────────────────────────────────────────
 let jwks;
 
 async function initJwks() {
@@ -43,51 +33,33 @@ async function initJwks() {
     const res = await fetch(discoveryUrl);
     if (!res.ok) throw new Error(`HTTP ${res.status} ${res.statusText}`);
     const doc = await res.json();
-    const jwksUri = doc.jwks_uri;
-    console.log('[JWKS] Discovered jwks_uri:', jwksUri);
-    jwks = jwksClient({
-      jwksUri,
-      cache: true,
-      cacheMaxEntries: 5,
-      cacheMaxAge: 600000
-    });
+    console.log('[JWKS] Discovered jwks_uri:', doc.jwks_uri);
+    jwks = jwksClient({ jwksUri: doc.jwks_uri, cache: true, cacheMaxEntries: 5, cacheMaxAge: 600000 });
   } catch (err) {
-    console.error('[JWKS] Discovery failed:', err.message);
-    // Fall back to the conventional Authentik path
     const fallback = `${AUTHENTIK_INTERNAL_URL}/application/o/taskpilot/jwks/`;
-    console.warn('[JWKS] Falling back to:', fallback);
-    jwks = jwksClient({
-      jwksUri: fallback,
-      cache: true,
-      cacheMaxEntries: 5,
-      cacheMaxAge: 600000
-    });
+    console.warn('[JWKS] Discovery failed:', err.message, '— falling back to', fallback);
+    jwks = jwksClient({ jwksUri: fallback, cache: true, cacheMaxEntries: 5, cacheMaxAge: 600000 });
   }
 }
 
 function getSigningKey(header, callback) {
   if (!jwks) return callback(new Error('JWKS client not initialised yet'));
   jwks.getSigningKey(header.kid, (err, key) => {
-    if (err) {
-      console.error('[JWKS] Failed to get signing key:', err.message);
-      return callback(err);
-    }
+    if (err) { console.error('[JWKS] Failed to get signing key:', err.message); return callback(err); }
     callback(null, key.getPublicKey());
   });
 }
 
-// ── Auth middleware ──────────────────────────────────────────────────────────
+// ── Auth ──────────────────────────────────────────────────────────────────────
 function requireAuth(req, res, next) {
   const authHeader = req.headers.authorization;
-  if (!authHeader || !authHeader.startsWith('Bearer ')) {
-    console.warn('[AUTH] Request missing Bearer token:', req.method, req.path);
+  if (!authHeader?.startsWith('Bearer ')) {
+    console.warn('[AUTH] Missing token:', req.method, req.path);
     return res.status(401).json({ error: 'Missing token' });
   }
   const token = authHeader.slice(7);
-
-  // Decode without verifying first, just to log what we received
   const unverified = jwt.decode(token, { complete: true });
-  console.log('[AUTH] Verifying token — iss:', unverified?.payload?.iss, '| aud:', unverified?.payload?.aud, '| kid:', unverified?.header?.kid);
+  console.log('[AUTH] iss:', unverified?.payload?.iss, '| aud:', unverified?.payload?.aud, '| kid:', unverified?.header?.kid);
 
   jwt.verify(token, getSigningKey, {
     audience: OIDC_CLIENT_ID,
@@ -95,7 +67,7 @@ function requireAuth(req, res, next) {
     algorithms: ['RS256']
   }, (err, decoded) => {
     if (err) {
-      console.error('[AUTH] Token verification failed:', err.name, '-', err.message);
+      console.error('[AUTH] Verification failed:', err.name, '-', err.message);
       return res.status(401).json({ error: 'Invalid token', detail: err.message });
     }
     req.user = {
@@ -103,108 +75,147 @@ function requireAuth(req, res, next) {
       username: decoded.preferred_username || decoded.email || decoded.sub,
       name: decoded.name || decoded.preferred_username || 'Unknown'
     };
-    console.log('[AUTH] Verified user:', req.user.username);
+    console.log('[AUTH] Verified:', req.user.username);
     next();
   });
 }
 
-// ── Data helpers ─────────────────────────────────────────────────────────────
-function ensureDataFile() {
-  const dir = path.dirname(DATA_FILE);
-  if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
-  if (!fs.existsSync(DATA_FILE)) fs.writeFileSync(DATA_FILE, JSON.stringify([]));
-}
-function readTasks() {
-  ensureDataFile();
-  return JSON.parse(fs.readFileSync(DATA_FILE, 'utf8'));
-}
-function writeTasks(tasks) {
-  ensureDataFile();
-  fs.writeFileSync(DATA_FILE, JSON.stringify(tasks, null, 2));
+// ── Helpers ───────────────────────────────────────────────────────────────────
+function rowToTask(row) {
+  return {
+    ...row,
+    estimatedDuration: Number(row.estimatedDuration),
+    priority: Number(row.priority),
+    recurrenceDays: row.recurrenceDays ? Number(row.recurrenceDays) : null
+  };
 }
 
-// ── Routes ───────────────────────────────────────────────────────────────────
+// When a recurring task is closed, create the next occurrence
+function scheduleNextRecurrence(task) {
+  if (!task.recurring || task.recurring === 'none') return;
+  const days = task.recurrenceDays || { daily: 1, weekly: 7, monthly: 30 }[task.recurring] || 7;
+  const base = task.dueDate ? new Date(task.dueDate) : new Date();
+  base.setDate(base.getDate() + days);
+  const nextDue = base.toISOString().substring(0, 10);
+  const newId = uuidv4();
+  db.run(
+    `INSERT INTO tasks (id,name,description,estimatedDuration,priority,dueDate,dateAdded,status,createdBy,createdByName,recurring,recurrenceDays)
+     VALUES (?,?,?,?,?,?,?,?,?,?,?,?)`,
+    [newId, task.name, task.description, task.estimatedDuration, task.priority,
+     nextDue, new Date().toISOString(), 'open',
+     task.createdBy, task.createdByName, task.recurring, task.recurrenceDays]
+  );
+  console.log(`[RECUR] Scheduled next occurrence of "${task.name}" for ${nextDue}`);
+}
 
-// GET /tasks
+// ── Routes ────────────────────────────────────────────────────────────────────
+
+// GET /tasks?status=open&sort=priority&order=asc
 app.get('/tasks', requireAuth, (req, res) => {
-  res.json(readTasks());
+  const { status, sort = 'dateAdded', order = 'desc' } = req.query;
+
+  const allowed = { dateAdded: 'dateAdded', priority: 'priority', dueDate: 'dueDate', name: 'name', estimatedDuration: 'estimatedDuration' };
+  const col = allowed[sort] || 'dateAdded';
+  const dir = order === 'asc' ? 'ASC' : 'DESC';
+
+  let sql = `SELECT * FROM tasks`;
+  const params = [];
+  if (status && status !== 'all') {
+    sql += ` WHERE status = ?`;
+    params.push(status);
+  }
+  // NULLs last for dueDate sort
+  if (col === 'dueDate') {
+    sql += ` ORDER BY CASE WHEN dueDate IS NULL THEN 1 ELSE 0 END, ${col} ${dir}`;
+  } else {
+    sql += ` ORDER BY ${col} ${dir}`;
+  }
+
+  res.json(db.all(sql, params).map(rowToTask));
 });
 
 // POST /tasks
 app.post('/tasks', requireAuth, (req, res) => {
-  const { name, description, estimatedDuration, priority, dueDate } = req.body;
+  const { name, description, estimatedDuration, priority, dueDate, recurring, recurrenceDays } = req.body;
   if (!name || !estimatedDuration || !priority)
     return res.status(400).json({ error: 'name, estimatedDuration, and priority are required' });
   if (priority < 1 || priority > 4)
     return res.status(400).json({ error: 'priority must be between 1 and 4' });
 
-  const task = {
-    id: uuidv4(),
-    name,
-    description: description || '',
-    estimatedDuration: Number(estimatedDuration),
-    priority: Number(priority),
-    dueDate: dueDate || null,
-    dateAdded: new Date().toISOString(),
-    status: 'open',
-    createdBy: req.user.username,
-    createdByName: req.user.name,
-    closedBy: null,
-    closedByName: null,
-    closedAt: null
-  };
-  const tasks = readTasks();
-  tasks.push(task);
-  writeTasks(tasks);
-  res.status(201).json(task);
+  const id = uuidv4();
+  db.run(
+    `INSERT INTO tasks (id,name,description,estimatedDuration,priority,dueDate,dateAdded,status,createdBy,createdByName,recurring,recurrenceDays)
+     VALUES (?,?,?,?,?,?,?,?,?,?,?,?)`,
+    [id, name, description || '', Number(estimatedDuration), Number(priority),
+     dueDate || null, new Date().toISOString(), 'open',
+     req.user.username, req.user.name,
+     recurring || 'none', recurrenceDays || null]
+  );
+  res.status(201).json(rowToTask(db.get('SELECT * FROM tasks WHERE id = ?', [id])));
 });
 
 // PUT /tasks/:id
 app.put('/tasks/:id', requireAuth, (req, res) => {
-  const tasks = readTasks();
-  const idx = tasks.findIndex(t => t.id === req.params.id);
-  if (idx === -1) return res.status(404).json({ error: 'Task not found' });
+  const existing = db.get('SELECT * FROM tasks WHERE id = ?', [req.params.id]);
+  if (!existing) return res.status(404).json({ error: 'Task not found' });
 
-  const task = tasks[idx];
-  const { name, description, estimatedDuration, priority, dueDate, status } = req.body;
+  const { name, description, estimatedDuration, priority, dueDate, status, recurring, recurrenceDays } = req.body;
 
-  if (name !== undefined) task.name = name;
-  if (description !== undefined) task.description = description;
-  if (estimatedDuration !== undefined) task.estimatedDuration = Number(estimatedDuration);
-  if (priority !== undefined) {
-    if (priority < 1 || priority > 4)
-      return res.status(400).json({ error: 'priority must be between 1 and 4' });
-    task.priority = Number(priority);
+  const updated = {
+    name: name ?? existing.name,
+    description: description ?? existing.description,
+    estimatedDuration: estimatedDuration != null ? Number(estimatedDuration) : Number(existing.estimatedDuration),
+    priority: priority != null ? Number(priority) : Number(existing.priority),
+    dueDate: dueDate !== undefined ? (dueDate || null) : existing.dueDate,
+    status: status ?? existing.status,
+    closedBy: existing.closedBy,
+    closedByName: existing.closedByName,
+    closedAt: existing.closedAt,
+    recurring: recurring ?? existing.recurring,
+    recurrenceDays: recurrenceDays != null ? Number(recurrenceDays) : existing.recurrenceDays
+  };
+
+  if (status === 'closed' && existing.status !== 'closed') {
+    updated.closedBy = req.user.username;
+    updated.closedByName = req.user.name;
+    updated.closedAt = new Date().toISOString();
   }
-  if (dueDate !== undefined) task.dueDate = dueDate || null;
-  if (status !== undefined) {
-    // Record who closed it
-    if (status === 'closed' && task.status !== 'closed') {
-      task.closedBy = req.user.username;
-      task.closedByName = req.user.name;
-      task.closedAt = new Date().toISOString();
-    }
-    if (status === 'open') {
-      task.closedBy = null;
-      task.closedByName = null;
-      task.closedAt = null;
-    }
-    task.status = status;
+  if (status === 'open') {
+    updated.closedBy = null; updated.closedByName = null; updated.closedAt = null;
   }
 
-  tasks[idx] = task;
-  writeTasks(tasks);
-  res.json(task);
+  db.run(
+    `UPDATE tasks SET name=?,description=?,estimatedDuration=?,priority=?,dueDate=?,status=?,
+     closedBy=?,closedByName=?,closedAt=?,recurring=?,recurrenceDays=? WHERE id=?`,
+    [updated.name, updated.description, updated.estimatedDuration, updated.priority,
+     updated.dueDate, updated.status, updated.closedBy, updated.closedByName, updated.closedAt,
+     updated.recurring, updated.recurrenceDays, req.params.id]
+  );
+
+  // Trigger recurrence if just closed
+  if (status === 'closed' && existing.status !== 'closed') {
+    scheduleNextRecurrence({ ...existing, ...updated });
+  }
+
+  res.json(rowToTask(db.get('SELECT * FROM tasks WHERE id = ?', [req.params.id])));
 });
 
 // DELETE /tasks/:id
 app.delete('/tasks/:id', requireAuth, (req, res) => {
-  const tasks = readTasks();
-  const idx = tasks.findIndex(t => t.id === req.params.id);
-  if (idx === -1) return res.status(404).json({ error: 'Task not found' });
-  tasks.splice(idx, 1);
-  writeTasks(tasks);
+  if (!db.get('SELECT id FROM tasks WHERE id = ?', [req.params.id]))
+    return res.status(404).json({ error: 'Task not found' });
+  db.run('DELETE FROM tasks WHERE id = ?', [req.params.id]);
   res.json({ success: true });
+});
+
+// GET /tasks/stats — overdue count etc.
+app.get('/tasks/stats', requireAuth, (req, res) => {
+  const now = new Date().toISOString().substring(0, 10);
+  const overdue = db.get(
+    `SELECT COUNT(*) as count FROM tasks WHERE status='open' AND dueDate IS NOT NULL AND dueDate < ?`, [now]
+  );
+  const open = db.get(`SELECT COUNT(*) as count FROM tasks WHERE status='open'`);
+  res.json({ overdue: Number(overdue.count), open: Number(open.count) });
 });
 
 // POST /tasks/suggest
@@ -213,42 +224,29 @@ app.post('/tasks/suggest', requireAuth, (req, res) => {
   if (!availableMinutes || availableMinutes <= 0)
     return res.status(400).json({ error: 'availableMinutes must be a positive number' });
 
-  const tasks = readTasks();
+  const candidates = db.all(
+    `SELECT * FROM tasks WHERE status='open' AND estimatedDuration <= ?`, [availableMinutes]
+  ).map(rowToTask).filter(t => !excludeIds.includes(t.id));
+
+  if (!candidates.length) return res.json({ task: null });
+
   const now = new Date();
-
-  const candidates = tasks.filter(t =>
-    t.status === 'open' &&
-    t.estimatedDuration <= availableMinutes &&
-    !excludeIds.includes(t.id)
-  );
-
-  if (candidates.length === 0) return res.json({ task: null });
-
   const ONE_MONTH_MS = 30 * 24 * 60 * 60 * 1000;
-  function isUrgent(task) {
-    if (!task.dueDate) return false;
-    return (new Date(task.dueDate) - now) <= ONE_MONTH_MS;
-  }
+  const isUrgent = t => t.dueDate && (new Date(t.dueDate) - now) <= ONE_MONTH_MS;
 
   candidates.sort((a, b) => {
-    const urgentA = isUrgent(a);
-    const urgentB = isUrgent(b);
-    if (urgentA !== urgentB) return urgentA ? -1 : 1;
-
-    if (urgentA && urgentB) {
-      const diff = new Date(a.dueDate) - new Date(b.dueDate);
-      if (diff !== 0) return diff;
+    const ua = isUrgent(a), ub = isUrgent(b);
+    if (ua !== ub) return ua ? -1 : 1;
+    if (ua && ub) {
+      const d = new Date(a.dueDate) - new Date(b.dueDate);
+      if (d) return d;
       if (a.priority !== b.priority) return a.priority - b.priority;
       return new Date(a.dateAdded) - new Date(b.dateAdded);
     }
-
     if (a.priority !== b.priority) return a.priority - b.priority;
     if (a.dueDate && !b.dueDate) return -1;
     if (!a.dueDate && b.dueDate) return 1;
-    if (a.dueDate && b.dueDate) {
-      const diff = new Date(a.dueDate) - new Date(b.dueDate);
-      if (diff !== 0) return diff;
-    }
+    if (a.dueDate && b.dueDate) { const d = new Date(a.dueDate) - new Date(b.dueDate); if (d) return d; }
     return new Date(a.dateAdded) - new Date(b.dateAdded);
   });
 
@@ -257,10 +255,11 @@ app.post('/tasks/suggest', requireAuth, (req, res) => {
 
 app.get('/health', (req, res) => res.json({ status: 'ok' }));
 
-// ── Boot ─────────────────────────────────────────────────────────────────────
-initJwks().then(() => {
+// ── Boot ──────────────────────────────────────────────────────────────────────
+async function start() {
+  await db.init();
+  try { await initJwks(); } catch (e) { console.error('JWKS init failed:', e.message); }
   app.listen(PORT, () => console.log(`TaskPilot API running on port ${PORT}`));
-}).catch(err => {
-  console.error('Fatal: could not initialise JWKS, starting anyway:', err.message);
-  app.listen(PORT, () => console.log(`TaskPilot API running on port ${PORT} (JWKS pending)`));
-});
+}
+
+start();

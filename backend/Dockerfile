@@ -1,8 +1,8 @@
 FROM node:20-alpine
 WORKDIR /app
-COPY package.json .
+COPY package.json package-lock.json ./
 RUN npm install --production
-COPY server.js .
+COPY server.js db.js ./
 VOLUME ["/data"]
-EXPOSE 3000
+EXPOSE 3010
 CMD ["node", "server.js"]
