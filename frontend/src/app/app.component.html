@@ -1,5 +1,5 @@
 <!-- ① Error -->
-<div class="error-screen" *ngIf="auth.initReady && auth.initError">
+<div class="error-screen" *ngIf="auth.state === 'error'">
   <div class="error-card">
     <div class="error-icon">⚠️</div>
     <h2>Authentication Error</h2>
@@ -17,19 +17,22 @@
   </div>
 </div>
 
-<!-- ② Loading (OIDC discovery + /me fetch) -->
-<div class="loading-screen" *ngIf="!auth.initReady">
+<!-- ② Loading (OIDC discovery + /me fetch + re-auth) -->
+<div class="loading-screen" *ngIf="auth.state === 'loading' || auth.state === 'reauthing'">
   <div class="loading-inner">
-    <div class="logo-symbol">◈</div>
+    <div class="logo-symbol" [class.reauthing]="auth.state === 'reauthing'">◈</div>
     <div class="loading-bar">
       <div class="loading-bar-fill"></div>
     </div>
     <p class="loading-msg">{{ auth.loadingMessage }}</p>
+    <p class="reauth-hint" *ngIf="auth.state === 'reauthing'">
+      You will be redirected to Authentik shortly…
+    </p>
   </div>
 </div>
 
 <!-- ③ App -->
-<div class="app-shell" *ngIf="auth.initReady && !auth.initError && auth.isLoggedIn">
+<div class="app-shell" *ngIf="auth.state === 'ready' && auth.isLoggedIn">
   <header class="app-header">
     <button class="logo-btn" (click)="setView('home')">
       <span class="logo-icon">◈</span>

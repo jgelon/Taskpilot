@@ -1,18 +1,25 @@
-import { Injectable } from '@angular/core';
-import { OAuthService, AuthConfig } from 'angular-oauth2-oidc';
+import { Injectable, NgZone } from '@angular/core';
+import { OAuthService, AuthConfig, OAuthEvent } from 'angular-oauth2-oidc';
 import { environment } from '../../environments/environment';
 
-export interface Features { points: boolean; streaks: boolean; achievements: boolean; leaderboard: boolean; }
+export interface Features {
+  points: boolean;
+  streaks: boolean;
+  achievements: boolean;
+  leaderboard: boolean;
+}
+
+export type AuthState = 'loading' | 'ready' | 'reauthing' | 'error';
 
 @Injectable({ providedIn: 'root' })
 export class AuthService {
-  initError: string | null = null;
-  initReady = false;
+  state: AuthState = 'loading';
   loadingMessage = 'Connecting to Authentik…';
-  private _isAdmin = false;
+  initError: string | null = null;
   features: Features = { points: true, streaks: true, achievements: true, leaderboard: true };
+  private _isAdmin = false;
 
-  constructor(private oauthService: OAuthService) {}
+  constructor(private oauthService: OAuthService, private ngZone: NgZone) {}
 
   async init(): Promise<void> {
     const config: AuthConfig = {
@@ -24,18 +31,25 @@ export class AuthService {
       showDebugInformation: !environment.production,
       strictDiscoveryDocumentValidation: false,
       clearHashAfterLogin: true,
-      timeoutFactor: 0.75
+      timeoutFactor: 0.75,
+      // Attempt silent refresh before token expires
+      sessionChecksEnabled: false,
+      silentRefreshTimeout: 5000,
     };
 
     this.oauthService.configure(config);
+    this.oauthService.setupAutomaticSilentRefresh();
+
+    // Listen for token events throughout the app lifecycle
+    this.oauthService.events.subscribe(e => this.handleOAuthEvent(e));
 
     try {
       this.loadingMessage = 'Connecting to Authentik…';
       await this.oauthService.loadDiscoveryDocumentAndTryLogin();
     } catch (err: any) {
       console.error('OIDC init failed:', err);
-      this.initError = `Could not reach Authentik at ${environment.authentikUrl}. Check AUTHENTIK_URL in your .env and that Authentik is reachable. (${err?.message ?? err})`;
-      this.initReady = true;
+      this.initError = `Could not reach Authentik at ${environment.authentikUrl}. Check your .env. (${err?.message ?? err})`;
+      this.state = 'error';
       return;
     }
 
@@ -46,7 +60,46 @@ export class AuthService {
 
     this.loadingMessage = 'Loading your profile…';
     await this.fetchRole();
-    this.initReady = true;
+    this.state = 'ready';
+  }
+
+  private handleOAuthEvent(e: OAuthEvent) {
+    console.log('[OAuth event]', e.type);
+
+    switch (e.type) {
+      // Token successfully refreshed — re-fetch role in case group membership changed
+      case 'token_refreshed':
+        this.fetchRole();
+        break;
+
+      // Silent refresh failed — try a full code flow redirect
+      case 'silent_refresh_error':
+      case 'token_refresh_error':
+        console.warn('[Auth] Silent refresh failed, re-authenticating…');
+        this.ngZone.run(() => {
+          this.state = 'reauthing';
+          this.loadingMessage = 'Session expired — re-authenticating…';
+        });
+        setTimeout(() => this.oauthService.initCodeFlow(), 1500);
+        break;
+
+      // Token expired and no refresh succeeded
+      case 'token_expires':
+        // setupAutomaticSilentRefresh will attempt a refresh;
+        // if it fails, token_refresh_error fires above
+        break;
+
+      // Session was terminated (e.g. logged out in Authentik)
+      case 'session_terminated':
+      case 'session_error':
+        console.warn('[Auth] Session terminated, redirecting to login…');
+        this.ngZone.run(() => {
+          this.state = 'reauthing';
+          this.loadingMessage = 'Session ended — redirecting to login…';
+        });
+        setTimeout(() => this.oauthService.initCodeFlow(), 1500);
+        break;
+    }
   }
 
   private async fetchRole(): Promise<void> {
@@ -59,12 +112,31 @@ export class AuthService {
         this._isAdmin = !!data.isAdmin;
         if (data.features) this.features = data.features;
         console.log('[Auth] isAdmin:', this._isAdmin, 'features:', this.features);
+      } else if (res.status === 401) {
+        // API also considers token invalid — trigger re-auth
+        this.ngZone.run(() => {
+          this.state = 'reauthing';
+          this.loadingMessage = 'Session expired — re-authenticating…';
+        });
+        setTimeout(() => this.oauthService.initCodeFlow(), 1500);
       }
     } catch (e) {
       console.warn('[Auth] Could not fetch /me:', e);
-      // Non-fatal — app still works, just defaults to non-admin
-      this._isAdmin = false;
     }
+  }
+
+  // Call this when any API call returns 401 to trigger re-auth
+  handleUnauthorized() {
+    if (this.state === 'reauthing') return; // already handling
+    console.warn('[Auth] 401 received — attempting token refresh');
+    this.ngZone.run(() => {
+      this.state = 'reauthing';
+      this.loadingMessage = 'Session expired — re-authenticating…';
+    });
+    // Try silent refresh first, fall back to full login after 3s
+    this.oauthService.silentRefresh().catch(() => {
+      setTimeout(() => this.oauthService.initCodeFlow(), 1500);
+    });
   }
 
   get isLoggedIn(): boolean {
@@ -91,5 +163,10 @@ export class AuthService {
 
   logout(): void {
     this.oauthService.logOut();
+  }
+
+  // Legacy compat — keep initReady working for existing template checks
+  get initReady(): boolean {
+    return this.state === 'ready' || this.state === 'error';
   }
 }
