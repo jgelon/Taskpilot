@@ -99,7 +99,10 @@ function rowToTask(row) {
     estimatedDuration: Number(row.estimatedDuration),
     priority: Number(row.priority),
     recurrenceDays: row.recurrenceDays ? Number(row.recurrenceDays) : null,
-    categoryId: row.categoryId || null
+    categoryId: row.categoryId || null,
+    claimedBy: row.claimedBy || null,
+    claimedByName: row.claimedByName || null,
+    claimedAt: row.claimedAt || null
   };
 }
 
@@ -222,7 +225,7 @@ app.post('/tasks', requireAuth, (req, res) => {
 app.put('/tasks/:id', requireAuth, (req, res) => {
   const existing = db.get('SELECT * FROM tasks WHERE id = ?', [req.params.id]);
   if (!existing) return res.status(404).json({ error: 'Task not found' });
-  const { name, description, estimatedDuration, priority, dueDate, status, recurring, recurrenceDays, categoryId } = req.body;
+  const { name, description, estimatedDuration, priority, dueDate, status, recurring, recurrenceDays, categoryId, claim } = req.body;
   const u = {
     name: name ?? existing.name,
     description: description ?? existing.description,
@@ -233,19 +236,40 @@ app.put('/tasks/:id', requireAuth, (req, res) => {
     closedBy: existing.closedBy, closedByName: existing.closedByName, closedAt: existing.closedAt,
     recurring: recurring ?? existing.recurring,
     recurrenceDays: recurrenceDays != null ? Number(recurrenceDays) : existing.recurrenceDays,
-    categoryId: categoryId !== undefined ? (categoryId||null) : existing.categoryId
+    categoryId: categoryId !== undefined ? (categoryId||null) : existing.categoryId,
+    claimedBy: existing.claimedBy, claimedByName: existing.claimedByName, claimedAt: existing.claimedAt
   };
+
+  // Claim task
+  if (claim === true) {
+    u.claimedBy = req.user.username;
+    u.claimedByName = req.user.name;
+    u.claimedAt = new Date().toISOString();
+  }
+  // Unclaim task (hand back)
+  if (claim === false) {
+    u.claimedBy = null; u.claimedByName = null; u.claimedAt = null;
+  }
+  // Closing always unsets claim
   if (status === 'closed' && existing.status !== 'closed') {
     u.closedBy = req.user.username; u.closedByName = req.user.name; u.closedAt = new Date().toISOString();
+    u.claimedBy = null; u.claimedByName = null; u.claimedAt = null;
   }
-  if (status === 'open') { u.closedBy = null; u.closedByName = null; u.closedAt = null; }
+  if (status === 'open' && existing.status === 'closed') {
+    u.closedBy = null; u.closedByName = null; u.closedAt = null;
+  }
+
   db.run(
     `UPDATE tasks SET name=?,description=?,estimatedDuration=?,priority=?,dueDate=?,status=?,
-      closedBy=?,closedByName=?,closedAt=?,recurring=?,recurrenceDays=?,categoryId=? WHERE id=?`,
+      closedBy=?,closedByName=?,closedAt=?,recurring=?,recurrenceDays=?,categoryId=?,
+      claimedBy=?,claimedByName=?,claimedAt=? WHERE id=?`,
     [u.name,u.description,u.estimatedDuration,u.priority,u.dueDate,u.status,
-     u.closedBy,u.closedByName,u.closedAt,u.recurring,u.recurrenceDays,u.categoryId,req.params.id]
+     u.closedBy,u.closedByName,u.closedAt,u.recurring,u.recurrenceDays,u.categoryId,
+     u.claimedBy,u.claimedByName,u.claimedAt,req.params.id]
   );
+
   if (status === 'closed' && existing.status !== 'closed') scheduleNextRecurrence({ ...existing, ...u });
+
   const row = db.get(
     `SELECT t.*, c.name as categoryName, c.color as categoryColor
      FROM tasks t LEFT JOIN categories c ON t.categoryId = c.id WHERE t.id = ?`, [req.params.id]
@@ -264,7 +288,20 @@ app.get('/tasks/stats', requireAuth, (req, res) => {
   const now = new Date().toISOString().substring(0, 10);
   const overdue = db.get(`SELECT COUNT(*) as count FROM tasks WHERE status='open' AND dueDate IS NOT NULL AND dueDate < ?`, [now]);
   const open = db.get(`SELECT COUNT(*) as count FROM tasks WHERE status='open'`);
-  res.json({ overdue: Number(overdue.count), open: Number(open.count) });
+
+  // Active task claimed by the current user
+  const claimed = db.get(
+    `SELECT t.*, c.name as categoryName, c.color as categoryColor
+     FROM tasks t LEFT JOIN categories c ON t.categoryId = c.id
+     WHERE t.status='open' AND t.claimedBy = ?`,
+    [req.user.username]
+  );
+
+  res.json({
+    overdue: Number(overdue.count),
+    open: Number(open.count),
+    claimedTask: claimed ? rowToTask(claimed) : null
+  });
 });
 
 app.post('/tasks/suggest', requireAuth, (req, res) => {
@@ -274,7 +311,9 @@ app.post('/tasks/suggest', requireAuth, (req, res) => {
   const candidates = db.all(
     `SELECT t.*, c.name as categoryName, c.color as categoryColor
      FROM tasks t LEFT JOIN categories c ON t.categoryId = c.id
-     WHERE t.status='open' AND t.estimatedDuration <= ?`, [availableMinutes]
+     WHERE t.status='open' AND t.estimatedDuration <= ?
+       AND (t.claimedBy IS NULL OR t.claimedBy = ?)`,
+    [availableMinutes, req.user.username]
   ).map(rowToTask).filter(t => !excludeIds.includes(t.id));
   if (!candidates.length) return res.json({ task: null });
   const now = new Date();

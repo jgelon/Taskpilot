@@ -1,10 +1,10 @@
-import { Component } from '@angular/core';
+import { Component, Input, OnChanges, SimpleChanges, Output, EventEmitter } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { TaskService, Task } from '../../services/task.service';
 import { AuthService } from '../../services/auth.service';
 
-type GetTaskState = 'input' | 'showing' | 'none' | 'accept';
+type GetTaskState = 'input' | 'showing' | 'none' | 'working';
 
 @Component({
   selector: 'app-get-task',
@@ -13,7 +13,11 @@ type GetTaskState = 'input' | 'showing' | 'none' | 'accept';
   templateUrl: './get-task.component.html',
   styleUrl: './get-task.component.scss'
 })
-export class GetTaskComponent {
+export class GetTaskComponent implements OnChanges {
+  /** If a task is already claimed by the current user, pass it in directly */
+  @Input() claimedTask: Task | null = null;
+  @Output() taskChanged = new EventEmitter<void>();
+
   state: GetTaskState = 'input';
   availableMinutes: number | null = null;
   currentTask: Task | null = null;
@@ -31,6 +35,14 @@ export class GetTaskComponent {
   ];
 
   constructor(private taskService: TaskService, public auth: AuthService) {}
+
+  ngOnChanges(changes: SimpleChanges) {
+    // If a claimed task is passed in (from home screen), go straight to working state
+    if (changes['claimedTask'] && this.claimedTask) {
+      this.currentTask = this.claimedTask;
+      this.state = 'working';
+    }
+  }
 
   setPreset(v: number) { this.availableMinutes = v; }
 
@@ -55,7 +67,19 @@ export class GetTaskComponent {
     this.getSuggestion();
   }
 
-  acceptTask() { this.state = 'accept'; }
+  acceptTask() {
+    if (!this.currentTask) return;
+    this.loading = true;
+    this.taskService.claimTask(this.currentTask.id).subscribe({
+      next: (task) => {
+        this.loading = false;
+        this.currentTask = task;
+        this.state = 'working';
+        this.taskChanged.emit();
+      },
+      error: () => { this.loading = false; this.showToast('Failed to claim task', 'error'); }
+    });
+  }
 
   finishTask(close: boolean) {
     if (!this.currentTask) return;
@@ -64,16 +88,38 @@ export class GetTaskComponent {
       this.taskService.updateTask(this.currentTask.id, { status: 'closed' }).subscribe({
         next: () => {
           this.loading = false;
-          this.showToast('Task marked as done! 🎉', 'success');
+          this.showToast('Task done! 🎉', 'success');
+          this.taskChanged.emit();
           this.reset();
         },
         error: () => { this.loading = false; this.showToast('Failed to update', 'error'); }
       });
     } else {
-      this.loading = false;
-      this.showToast('Task kept open, back to the pile.', 'success');
-      this.reset();
+      // Keep open but unclaim — hand back to the pile
+      this.taskService.unclaimTask(this.currentTask.id).subscribe({
+        next: () => {
+          this.loading = false;
+          this.showToast('Task handed back to the pile.', 'success');
+          this.taskChanged.emit();
+          this.reset();
+        },
+        error: () => { this.loading = false; this.showToast('Failed to unclaim', 'error'); }
+      });
     }
+  }
+
+  handBack() {
+    if (!this.currentTask) return;
+    this.loading = true;
+    this.taskService.unclaimTask(this.currentTask.id).subscribe({
+      next: () => {
+        this.loading = false;
+        this.showToast('Task returned to the pile.', 'success');
+        this.taskChanged.emit();
+        this.reset();
+      },
+      error: () => { this.loading = false; this.showToast('Failed to unclaim', 'error'); }
+    });
   }
 
   reset() {

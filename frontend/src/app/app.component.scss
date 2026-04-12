@@ -308,3 +308,57 @@
   @extend %skeleton-base;
   height: 80px;
 }
+
+/* Active task card on home */
+.active-task-card {
+  display: flex; flex-direction: column; gap: 8px;
+  cursor: pointer;
+  border-color: rgba(255,170,51,0.4) !important;
+  background: rgba(255,170,51,0.04) !important;
+  &:hover { border-color: var(--warning) !important; background: rgba(255,170,51,0.08) !important; }
+}
+
+.active-task-indicator {
+  display: flex; align-items: center; gap: 7px;
+}
+
+.active-dot {
+  width: 8px; height: 8px; border-radius: 50%; background: var(--warning);
+  animation: pulse-warn 1.5s ease-in-out infinite;
+  flex-shrink: 0;
+}
+@keyframes pulse-warn {
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50% { opacity: 0.4; transform: scale(0.7); }
+}
+
+.active-label {
+  font-size: 11px; font-weight: 700; text-transform: uppercase;
+  letter-spacing: 0.08em; color: var(--warning);
+}
+
+.active-task-body {
+  display: flex; align-items: center; gap: 10px;
+}
+
+.active-task-name {
+  font-family: var(--font-head); font-size: 16px; font-weight: 700;
+  color: var(--text); flex: 1;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+
+.active-task-meta {
+  display: flex; gap: 12px; font-size: 12px; color: var(--text-muted);
+}
+
+.active-task-cat { font-weight: 600; }
+
+.active-task-cta {
+  font-size: 12px; color: var(--warning); font-weight: 600; opacity: 0.8;
+  align-self: flex-end;
+}
+
+.action-card.disabled {
+  opacity: 0.35; cursor: not-allowed;
+  &:hover { transform: none; border-color: var(--border); background: var(--surface); }
+}

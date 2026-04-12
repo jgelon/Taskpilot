@@ -50,9 +50,13 @@ export class AppComponent implements OnInit, OnDestroy {
     });
   }
 
+  get claimedTask() { return this.stats?.claimedTask ?? null; }
+
   setView(view: View) {
     this.currentView = view;
     this.settingsOpen = false;
     if (view === 'home') this.loadStats();
   }
+
+  onTaskChanged() { this.loadStats(); }
 }

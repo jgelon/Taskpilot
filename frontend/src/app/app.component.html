@@ -108,7 +108,7 @@
       <button class="back-btn" (click)="setView('home')">← Back</button>
       <app-create-task *ngIf="currentView === 'create'" (done)="setView('home')"></app-create-task>
       <app-task-list *ngIf="currentView === 'list'"></app-task-list>
-      <app-get-task *ngIf="currentView === 'get'"></app-get-task>
+      <app-get-task *ngIf="currentView === 'get'" [claimedTask]="claimedTask" (taskChanged)="onTaskChanged()"></app-get-task>
     </div>
   </main>
 

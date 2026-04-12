@@ -130,7 +130,8 @@ Browser / Mobile
 |---|---|
 | ➕ Create Task | Name, description, duration, priority 1–4, due date, category, recurring schedule |
 | 📋 View Tasks | Filter by status and category, sort by any field with ↑↓ toggle |
-| ⚡ Get a Task | Enter available time → best-fit task with accept/skip/done/keep-open flow |
+| ⚡ Get a Task | Enter available time → best-fit task suggestion. Accept to claim it exclusively. |
+| 🔒 Task claiming | Accepting a task claims it for you — others won't see it in suggestions. Home screen shows your active task and blocks getting a new one until you finish or hand it back. |
 | ✏️ Edit Task | Change any field including category and recurrence. Mark done, reopen, delete. |
 | 🏷 Categories | Color-coded, managed in Settings (admin only). Filter chips in task list. |
 | 🔁 Recurring Tasks | Auto-reopens with shifted due date on close. Daily/weekly/monthly/custom. |
@@ -212,7 +213,7 @@ All require `Authorization: Bearer <token>` except `/health`. Routes marked 🔒
 | `DELETE` | `/categories/:id` | 🔒 admin | Delete category |
 | `GET` | `/tasks` | user | List tasks (filterable + sortable) |
 | `POST` | `/tasks` | user | Create task |
-| `PUT` | `/tasks/:id` | user | Update task |
+| `PUT` | `/tasks/:id` | user | Update task. Pass `claim: true` to claim, `claim: false` to unclaim. |
 | `DELETE` | `/tasks/:id` | user | Delete task |
 | `GET` | `/tasks/stats` | user | Overdue + open counts |
 | `POST` | `/tasks/suggest` | user | Best task for available time |

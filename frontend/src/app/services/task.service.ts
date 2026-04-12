@@ -29,9 +29,16 @@ export interface Task {
   categoryId: string | null;
   categoryName: string | null;
   categoryColor: string | null;
+  claimedBy: string | null;
+  claimedByName: string | null;
+  claimedAt: string | null;
 }
 
-export interface TaskStats { overdue: number; open: number; }
+export interface TaskStats {
+  overdue: number;
+  open: number;
+  claimedTask: Task | null;
+}
 export interface CreateTaskDto {
   name: string; description?: string; estimatedDuration: number; priority: number;
   dueDate?: string | null; recurring?: string; recurrenceDays?: number | null; categoryId?: string | null;
@@ -92,6 +99,12 @@ export class TaskService {
     return this.http.post<{ task: Task | null }>(
       `${this.api}/tasks/suggest`, { availableMinutes, excludeIds }, { headers: this.h() }
     );
+  }
+  claimTask(id: string): Observable<Task> {
+    return this.http.put<Task>(`${this.api}/tasks/${id}`, { claim: true }, { headers: this.h() });
+  }
+  unclaimTask(id: string): Observable<Task> {
+    return this.http.put<Task>(`${this.api}/tasks/${id}`, { claim: false }, { headers: this.h() });
   }
   exportCsv(): Observable<Blob> {
     return this.http.get(`${this.api}/tasks/export`, { headers: this.h(), responseType: 'blob' });

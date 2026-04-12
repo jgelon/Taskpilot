@@ -53,15 +53,23 @@ async function init() {
       closedAt TEXT,
       recurring TEXT DEFAULT 'none',
       recurrenceDays INTEGER,
-      categoryId TEXT REFERENCES categories(id) ON DELETE SET NULL
+      categoryId TEXT REFERENCES categories(id) ON DELETE SET NULL,
+      claimedBy TEXT,
+      claimedByName TEXT,
+      claimedAt TEXT
     )
   `);
 
-  // Migration: add categoryId column if upgrading from older schema
-  try {
-    db.run('ALTER TABLE tasks ADD COLUMN categoryId TEXT REFERENCES categories(id) ON DELETE SET NULL');
-    console.log('[DB] Migrated: added categoryId column');
-  } catch (_) { /* already exists */ }
+  // Migrations for upgrades from older schemas
+  const migrations = [
+    'ALTER TABLE tasks ADD COLUMN categoryId TEXT REFERENCES categories(id) ON DELETE SET NULL',
+    'ALTER TABLE tasks ADD COLUMN claimedBy TEXT',
+    'ALTER TABLE tasks ADD COLUMN claimedByName TEXT',
+    'ALTER TABLE tasks ADD COLUMN claimedAt TEXT',
+  ];
+  for (const sql of migrations) {
+    try { db.run(sql); } catch (_) { /* column already exists */ }
+  }
 
   save();
 }
