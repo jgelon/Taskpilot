@@ -11,9 +11,74 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;1,9..40,300&display=swap" rel="stylesheet">
-  <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><text y='26' font-size='28'>◈</text></svg>">
+  <!-- Android Chrome icon (SVG data URI doesn't work reliably on Android) -->
+  <link rel="icon" type="image/png" sizes="192x192" href="icons/icon-192.png">
+  <link rel="icon" type="image/png" sizes="512x512" href="icons/icon-512.png">
+  <link rel="manifest" href="manifest.webmanifest">
+  <link rel="apple-touch-icon" href="icons/icon-192.png">
+  <style>
+    /* Prevent black flash before Angular bootstraps */
+    html, body {
+      background: #0d0d0f;
+      margin: 0; padding: 0;
+      min-height: 100%;
+    }
+    /* Inline splash shown before app-root renders */
+    #splash {
+      position: fixed; inset: 0;
+      background: #0d0d0f;
+      display: flex; flex-direction: column;
+      align-items: center; justify-content: center;
+      gap: 20px; z-index: 9999;
+      font-family: sans-serif;
+      transition: opacity 0.3s ease;
+    }
+    #splash-symbol {
+      font-size: 48px; color: #c8f135;
+      animation: splash-pulse 2s ease-in-out infinite;
+    }
+    #splash-bar {
+      width: 160px; height: 3px;
+      background: #2a2a32; border-radius: 2px; overflow: hidden;
+    }
+    #splash-bar-fill {
+      height: 100%; width: 40%; background: #c8f135; border-radius: 2px;
+      animation: splash-slide 1.4s ease-in-out infinite;
+    }
+    @keyframes splash-pulse {
+      0%, 100% { opacity: 1; }
+      50% { opacity: 0.5; }
+    }
+    @keyframes splash-slide {
+      0%   { transform: translateX(-100%); }
+      100% { transform: translateX(350%); }
+    }
+  </style>
 </head>
 <body>
+  <!-- Inline splash — visible immediately, before any JS loads -->
+  <div id="splash">
+    <div id="splash-symbol">◈</div>
+    <div id="splash-bar"><div id="splash-bar-fill"></div></div>
+  </div>
+
   <app-root></app-root>
+
+  <script>
+    // Hide splash once Angular has had a chance to render
+    // MutationObserver watches for app-root to get children
+    const splash = document.getElementById('splash');
+    const appRoot = document.querySelector('app-root');
+    if (appRoot) {
+      const obs = new MutationObserver(() => {
+        if (appRoot.children.length > 0) {
+          splash.style.opacity = '0';
+          setTimeout(() => splash.remove(), 350);
+          obs.disconnect();
+        }
+      });
+      obs.observe(appRoot, { childList: true });
+    }
+  </script>
 </body>
 </html>
