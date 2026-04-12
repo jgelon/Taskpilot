@@ -5,6 +5,8 @@ import { environment } from '../../environments/environment';
 @Injectable({ providedIn: 'root' })
 export class AuthService {
   initError: string | null = null;
+  initReady = false;
+  loadingMessage = 'Connecting to Authentik…';
   private _isAdmin = false;
 
   constructor(private oauthService: OAuthService) {}
@@ -25,10 +27,12 @@ export class AuthService {
     this.oauthService.configure(config);
 
     try {
+      this.loadingMessage = 'Connecting to Authentik…';
       await this.oauthService.loadDiscoveryDocumentAndTryLogin();
     } catch (err: any) {
       console.error('OIDC init failed:', err);
       this.initError = `Could not reach Authentik at ${environment.authentikUrl}. Check AUTHENTIK_URL in your .env and that Authentik is reachable. (${err?.message ?? err})`;
+      this.initReady = true;
       return;
     }
 
@@ -37,8 +41,9 @@ export class AuthService {
       return;
     }
 
-    // Fetch role from backend /me endpoint
+    this.loadingMessage = 'Loading your profile…';
     await this.fetchRole();
+    this.initReady = true;
   }
 
   private async fetchRole(): Promise<void> {
@@ -53,6 +58,8 @@ export class AuthService {
       }
     } catch (e) {
       console.warn('[Auth] Could not fetch /me:', e);
+      // Non-fatal — app still works, just defaults to non-admin
+      this._isAdmin = false;
     }
   }
 

@@ -23,6 +23,7 @@ export class AppComponent implements OnInit, OnDestroy {
   currentView: View = 'home';
   settingsOpen = false;
   stats: TaskStats | null = null;
+  statsLoading = true;
   window = window;
   private sub: Subscription | null = null;
 
@@ -42,7 +43,11 @@ export class AppComponent implements OnInit, OnDestroy {
   ngOnDestroy() { this.sub?.unsubscribe(); }
 
   loadStats() {
-    this.taskService.getStats().subscribe({ next: s => this.stats = s, error: () => {} });
+    this.statsLoading = true;
+    this.taskService.getStats().subscribe({
+      next: s => { this.stats = s; this.statsLoading = false; },
+      error: () => { this.statsLoading = false; }
+    });
   }
 
   setView(view: View) {

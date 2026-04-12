@@ -1,4 +1,5 @@
-<div class="error-screen" *ngIf="auth.initError">
+<!-- ① Error -->
+<div class="error-screen" *ngIf="auth.initReady && auth.initError">
   <div class="error-card">
     <div class="error-icon">⚠️</div>
     <h2>Authentication Error</h2>
@@ -16,15 +17,19 @@
   </div>
 </div>
 
-<div class="loading-screen" *ngIf="!auth.initError && !auth.isLoggedIn">
+<!-- ② Loading (OIDC discovery + /me fetch) -->
+<div class="loading-screen" *ngIf="!auth.initReady">
   <div class="loading-inner">
     <div class="logo-symbol">◈</div>
-    <div class="loading-spinner"></div>
-    <p>Connecting to Authentik…</p>
+    <div class="loading-bar">
+      <div class="loading-bar-fill"></div>
+    </div>
+    <p class="loading-msg">{{ auth.loadingMessage }}</p>
   </div>
 </div>
 
-<div class="app-shell" *ngIf="!auth.initError && auth.isLoggedIn">
+<!-- ③ App -->
+<div class="app-shell" *ngIf="auth.initReady && !auth.initError && auth.isLoggedIn">
   <header class="app-header">
     <button class="logo-btn" (click)="setView('home')">
       <span class="logo-icon">◈</span>
@@ -41,6 +46,7 @@
   </header>
 
   <main class="app-main">
+    <!-- Home view -->
     <div class="home-view" *ngIf="currentView === 'home'">
       <div class="home-hero">
         <div class="hero-symbol">◈</div>
@@ -48,38 +54,54 @@
         <p class="hero-sub">Navigate your work, one task at a time.</p>
       </div>
 
-      <div class="overdue-banner" *ngIf="stats && stats.overdue > 0" (click)="setView('list')">
-        <span class="overdue-icon">⚠️</span>
-        <span class="overdue-text">
-          <strong>{{ stats.overdue }}</strong> overdue {{ stats.overdue === 1 ? 'task' : 'tasks' }}
-        </span>
-        <span class="overdue-cta">View →</span>
-      </div>
+      <!-- Overdue banner — real or skeleton -->
+      <ng-container *ngIf="!statsLoading; else bannerSkeleton">
+        <div class="overdue-banner" *ngIf="stats && stats.overdue > 0" (click)="setView('list')">
+          <span class="overdue-icon">⚠️</span>
+          <span class="overdue-text">
+            <strong>{{ stats.overdue }}</strong> overdue {{ stats.overdue === 1 ? 'task' : 'tasks' }}
+          </span>
+          <span class="overdue-cta">View →</span>
+        </div>
+      </ng-container>
+      <ng-template #bannerSkeleton>
+        <div class="skeleton-banner"></div>
+      </ng-template>
 
-      <div class="home-actions">
-        <button class="action-card action-create" (click)="setView('create')">
-          <span class="action-icon">＋</span>
-          <div class="action-text">
-            <span class="action-label">Create Task</span>
-            <span class="action-desc">Add a new task to your pile</span>
-          </div>
-        </button>
-        <button class="action-card action-list" (click)="setView('list')">
-          <span class="action-icon">≡</span>
-          <div class="action-text">
-            <span class="action-label">View Tasks</span>
-            <span class="action-desc">Browse and edit all tasks</span>
-          </div>
-          <span class="open-count" *ngIf="stats && stats.open > 0">{{ stats.open }}</span>
-        </button>
-        <button class="action-card action-get" (click)="setView('get')">
-          <span class="action-icon">⚡</span>
-          <div class="action-text">
-            <span class="action-label">Get a Task</span>
-            <span class="action-desc">Find what to do right now</span>
-          </div>
-        </button>
-      </div>
+      <!-- Action cards — real or skeleton -->
+      <ng-container *ngIf="!statsLoading; else cardsSkeleton">
+        <div class="home-actions">
+          <button class="action-card action-create" (click)="setView('create')">
+            <span class="action-icon">＋</span>
+            <div class="action-text">
+              <span class="action-label">Create Task</span>
+              <span class="action-desc">Add a new task to your pile</span>
+            </div>
+          </button>
+          <button class="action-card action-list" (click)="setView('list')">
+            <span class="action-icon">≡</span>
+            <div class="action-text">
+              <span class="action-label">View Tasks</span>
+              <span class="action-desc">Browse and edit all tasks</span>
+            </div>
+            <span class="open-count" *ngIf="stats && stats.open > 0">{{ stats.open }}</span>
+          </button>
+          <button class="action-card action-get" (click)="setView('get')">
+            <span class="action-icon">⚡</span>
+            <div class="action-text">
+              <span class="action-label">Get a Task</span>
+              <span class="action-desc">Find what to do right now</span>
+            </div>
+          </button>
+        </div>
+      </ng-container>
+      <ng-template #cardsSkeleton>
+        <div class="home-actions">
+          <div class="skeleton-card"></div>
+          <div class="skeleton-card"></div>
+          <div class="skeleton-card"></div>
+        </div>
+      </ng-template>
     </div>
 
     <div class="view-container" *ngIf="currentView !== 'home'">
@@ -90,6 +112,5 @@
     </div>
   </main>
 
-  <!-- Settings slide-over -->
   <app-settings *ngIf="settingsOpen" [isAdmin]="auth.isAdmin" (close)="settingsOpen = false"></app-settings>
 </div>
