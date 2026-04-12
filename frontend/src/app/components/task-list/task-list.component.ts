@@ -1,4 +1,4 @@
-import { Component, OnInit } from '@angular/core';
+import { Component, OnInit, Output, EventEmitter } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { TaskService, Task, Category, SortField, SortOrder } from '../../services/task.service';
@@ -18,6 +18,8 @@ export class TaskListComponent implements OnInit {
   sortField: SortField = 'dateAdded'; sortOrder: SortOrder = 'desc';
   filterCategoryId: string | undefined = undefined;
   toast: { msg: string; type: string } | null = null;
+  lastGamResult: any = null;
+  @Output() taskClosed = new EventEmitter<any>();
 
   sortOptions: { value: SortField; label: string }[] = [
     { value: 'dateAdded', label: 'Date added' }, { value: 'priority', label: 'Priority' },
@@ -46,7 +48,11 @@ export class TaskListComponent implements OnInit {
   setCategoryFilter(id: string | undefined) { this.filterCategoryId = id; this.loadTasks(); }
 
   openEdit(task: Task) { this.editingTask = { ...task }; }
-  onEditDone() { this.editingTask = null; this.loadTasks(); }
+  onEditDone(gamResult?: any) {
+    this.editingTask = null;
+    this.loadTasks();
+    if (gamResult) this.taskClosed.emit(gamResult);
+  }
   onEditCancel() { this.editingTask = null; }
 
   recurLabel(t: Task): string | null {

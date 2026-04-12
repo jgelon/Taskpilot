@@ -4,6 +4,7 @@ const { v4: uuidv4 } = require('uuid');
 const jwksClient = require('jwks-rsa');
 const jwt = require('jsonwebtoken');
 const db = require('./db');
+const gamification = require('./gamification');
 
 const app = express();
 const PORT = process.env.PORT || 3010;
@@ -13,6 +14,9 @@ const OIDC_CLIENT_ID = process.env.OIDC_CLIENT_ID;
 const FRONTEND_URL = process.env.FRONTEND_URL;
 const ADMIN_GROUP = process.env.ADMIN_GROUP || 'taskpilot-admin';
 
+// Feature flags now stored in DB (seeded from env vars on first boot)
+// Read dynamically per request via db.getFeatures()
+
 console.log('=== TaskPilot API starting ===');
 console.log('PORT              :', PORT);
 console.log('AUTHENTIK_URL     :', AUTHENTIK_URL);
@@ -20,6 +24,7 @@ console.log('AUTHENTIK_INTERNAL:', AUTHENTIK_INTERNAL_URL);
 console.log('OIDC_CLIENT_ID    :', OIDC_CLIENT_ID);
 console.log('FRONTEND_URL      :', FRONTEND_URL);
 console.log('ADMIN_GROUP       :', ADMIN_GROUP);
+console.log('(features loaded from DB at runtime)');
 console.log('==============================');
 
 app.use(cors({ origin: FRONTEND_URL, credentials: true }));
@@ -130,7 +135,8 @@ app.get('/me', requireAuth, (req, res) => {
     username: req.user.username,
     name: req.user.name,
     groups: req.user.groups,
-    isAdmin: req.user.isAdmin
+    isAdmin: req.user.isAdmin,
+    features: db.getFeatures()
   });
 });
 
@@ -268,7 +274,16 @@ app.put('/tasks/:id', requireAuth, (req, res) => {
      u.claimedBy,u.claimedByName,u.claimedAt,req.params.id]
   );
 
-  if (status === 'closed' && existing.status !== 'closed') scheduleNextRecurrence({ ...existing, ...u });
+  if (status === 'closed' && existing.status !== 'closed') {
+    scheduleNextRecurrence({ ...existing, ...u });
+    // Always calculate points (stored), only return if features enabled
+    const result = gamification.processTaskClose({ ...existing, ...u }, req.user);
+    const row2 = db.get(
+      `SELECT t.*, c.name as categoryName, c.color as categoryColor
+       FROM tasks t LEFT JOIN categories c ON t.categoryId = c.id WHERE t.id = ?`, [req.params.id]
+    );
+    return res.json({ ...rowToTask(row2), _gamification: result });
+  }
 
   const row = db.get(
     `SELECT t.*, c.name as categoryName, c.color as categoryColor
@@ -408,6 +423,32 @@ app.post('/tasks/import', requireAuth, requireAdmin, (req, res) => {
     } catch(err) { skipped++; errors.push(`Row ${i+1}: ${err.message}`); }
   }
   res.json({ created, updated, skipped, errors });
+});
+
+// ── Gamification Routes ───────────────────────────────────────────────────────
+app.get('/gamification/me', requireAuth, (req, res) => {
+  const stats = gamification.getUserStats(req.user.username);
+  res.json({ stats, features: db.getFeatures(), allAchievements: gamification.getAllAchievements() });
+});
+
+app.get('/gamification/leaderboard', requireAuth, (req, res) => {
+  if (!db.getFeatures().leaderboard) return res.status(403).json({ error: 'Feature disabled' });
+  res.json(gamification.getLeaderboard());
+});
+
+// ── App settings routes (admin only) ─────────────────────────────────────────
+app.get('/settings/features', requireAuth, requireAdmin, (req, res) => {
+  res.json(db.getFeatures());
+});
+
+app.put('/settings/features', requireAuth, requireAdmin, (req, res) => {
+  const allowed = ['points', 'streaks', 'achievements', 'leaderboard'];
+  for (const key of allowed) {
+    if (key in req.body) {
+      db.setSetting(`feature_${key}`, req.body[key] ? 'true' : 'false');
+    }
+  }
+  res.json(db.getFeatures());
 });
 
 app.get('/health', (req, res) => res.json({ status: 'ok' }));

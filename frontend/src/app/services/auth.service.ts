@@ -2,12 +2,15 @@ import { Injectable } from '@angular/core';
 import { OAuthService, AuthConfig } from 'angular-oauth2-oidc';
 import { environment } from '../../environments/environment';
 
+export interface Features { points: boolean; streaks: boolean; achievements: boolean; leaderboard: boolean; }
+
 @Injectable({ providedIn: 'root' })
 export class AuthService {
   initError: string | null = null;
   initReady = false;
   loadingMessage = 'Connecting to Authentik…';
   private _isAdmin = false;
+  features: Features = { points: true, streaks: true, achievements: true, leaderboard: true };
 
   constructor(private oauthService: OAuthService) {}
 
@@ -54,7 +57,8 @@ export class AuthService {
       if (res.ok) {
         const data = await res.json();
         this._isAdmin = !!data.isAdmin;
-        console.log('[Auth] isAdmin:', this._isAdmin);
+        if (data.features) this.features = data.features;
+        console.log('[Auth] isAdmin:', this._isAdmin, 'features:', this.features);
       }
     } catch (e) {
       console.warn('[Auth] Could not fetch /me:', e);

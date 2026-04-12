@@ -137,11 +137,61 @@ Browser / Mobile
 | 🔁 Recurring Tasks | Auto-reopens with shifted due date on close. Daily/weekly/monthly/custom. |
 | ⚠️ Overdue Banner | Home screen warning with count of overdue tasks |
 | 🔢 Open Count | Open task count badge on View Tasks home button |
-| ⚙️ Settings Panel | Slide-over (gear icon, top-right, admin only): category management + import/export |
+| ⚙️ Settings Panel | Slide-over (gear icon, top-right, admin only): categories, feature flags, and import/export |
 | ⇅ Import / Export | Export all tasks to CSV with IDs. Import with upsert-by-ID logic. (admin only) |
 | 🔐 Authentication | OIDC login via Authentik. All API calls require a valid Bearer token. |
 | 👥 Role-based access | `taskpilot-admin` group gates Settings. Enforced on both frontend and backend. |
+| 🏆 Points | Earn points on task close: `duration × priority_multiplier`. Streak and overdue bonuses apply. Always calculated; hidden when `FEATURE_POINTS=false`. |
+| 🔥 Streaks | Daily close streak with longest streak tracking. Visible when `FEATURE_STREAKS=true`. |
+| 🎖 Achievements | 12 unlockable badges (first close, streaks, speed run, early bird, etc.). Visible when `FEATURE_ACHIEVEMENTS=true`. |
+| 📊 Leaderboard | Weekly + all-time rankings by points. Visible when `FEATURE_LEADERBOARD=true`. |
 | 👤 User Tracking | Tasks record `createdBy` and `closedBy` with timestamps (visible in edit view) |
+
+---
+
+## Gamification
+
+Access via the 🏆 trophy icon in the header. Points are always tracked server-side; each flag only controls visibility in the UI.
+
+### Points formula
+```
+base = estimatedDuration × priority_multiplier (P1=4×, P2=3×, P3=2×, P4=1×)
+streak_bonus = min(currentStreak × 10%, 100%)
+overdue_penalty = 0.8 if task was overdue, else 1.0
+points = round(base × (1 + streak_bonus) × overdue_penalty)
+```
+
+### Achievements
+
+| Icon | Name | How to earn |
+|---|---|---|
+| 🚀 | First Flight | Close your first task |
+| 🔥 | On Fire | Reach a 3-day streak |
+| 🗓️ | Consistent | Reach a 7-day streak |
+| 💎 | Diamond | Reach a 30-day streak |
+| ⚡ | Lightning | Close a critical (P1) task |
+| 🎯 | Sharpshooter | Close 5 high-priority tasks in one day |
+| 🏆 | Century | Close 100 tasks total |
+| 🌅 | Early Bird | Close a task before 9:00 AM |
+| 🌙 | Night Owl | Close a task after 11:00 PM |
+| 🏃 | Speed Run | Finish a claimed task faster than its estimated time |
+| 🧹 | Clean Sweep | Clear the last overdue task |
+| 👑 | Top Pilot | Reach #1 on the leaderboard |
+
+### Feature flags
+
+Feature flags are stored in the database and can be toggled live from the **Settings → Features** tab (admin only) — no restart or rebuild needed.
+
+The `.env` variables below set the **initial** defaults when the database is first created. After that, use the Settings UI to change them.
+
+| Variable | Default | Effect when off |
+|---|---|---|
+| `FEATURE_POINTS` | `true` | Points hidden in UI (still calculated and stored) |
+| `FEATURE_STREAKS` | `true` | Streak display hidden |
+| `FEATURE_ACHIEVEMENTS` | `true` | Achievements tab hidden |
+| `FEATURE_LEADERBOARD` | `true` | Leaderboard tab and API endpoint disabled |
+
+> **Note:** Points are always calculated server-side regardless of the flag, so turning points back on will show the correct accumulated totals.
 
 ---
 

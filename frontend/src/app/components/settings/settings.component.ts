@@ -2,9 +2,10 @@ import { Component, OnInit, Output, EventEmitter, Input } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { TaskService, Category } from '../../services/task.service';
+import { Features } from '../../services/auth.service';
 import { ImportExportComponent } from '../import-export/import-export.component';
 
-type SettingsTab = 'categories' | 'importexport';
+type SettingsTab = 'categories' | 'features' | 'importexport';
 
 @Component({
   selector: 'app-settings',
@@ -35,6 +36,11 @@ export class SettingsComponent implements OnInit {
   confirmDeleteId: string | null = null;
   toast: { msg: string; type: string } | null = null;
 
+  // Feature flags
+  features: Features = { points: true, streaks: true, achievements: true, leaderboard: true };
+  featuresLoading = false;
+  featuresChanged = false;
+
   readonly PRESET_COLORS = [
     '#7b61ff', '#c8f135', '#ff5c5c', '#ffaa33',
     '#3dffa0', '#33d6ff', '#ff61d8', '#a0a0b0'
@@ -42,7 +48,38 @@ export class SettingsComponent implements OnInit {
 
   constructor(private taskService: TaskService) {}
 
-  ngOnInit() { this.loadCategories(); }
+  ngOnInit() {
+    this.loadCategories();
+    this.loadFeatures();
+  }
+
+  loadFeatures() {
+    this.taskService.getFeatures().subscribe({
+      next: f => { this.features = f; },
+      error: () => {}
+    });
+  }
+
+  toggleFeature(key: keyof Features) {
+    this.features[key] = !this.features[key];
+    this.featuresChanged = true;
+  }
+
+  saveFeatures() {
+    this.featuresLoading = true;
+    this.taskService.updateFeatures(this.features).subscribe({
+      next: f => {
+        this.features = f;
+        this.featuresLoading = false;
+        this.featuresChanged = false;
+        this.showToast('Feature settings saved', 'success');
+      },
+      error: () => {
+        this.featuresLoading = false;
+        this.showToast('Failed to save', 'error');
+      }
+    });
+  }
 
   loadCategories() {
     this.loading = true;
