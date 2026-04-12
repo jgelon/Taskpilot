@@ -40,6 +40,7 @@
         <span class="user-avatar">{{ auth.userProfile.name.charAt(0).toUpperCase() }}</span>
         <span class="user-name">{{ auth.userProfile.name }}</span>
       </div>
+      <button class="icon-header-btn trophy-btn" *ngIf="anyGamificationEnabled" (click)="setView('gamification')" title="Stats &amp; Achievements">🏆</button>
       <button class="icon-header-btn" *ngIf="auth.isAdmin" (click)="settingsOpen = true" title="Settings">⚙</button>
       <button class="icon-header-btn logout" (click)="auth.logout()" title="Sign out">⏻</button>
     </div>
@@ -107,10 +108,24 @@
     <div class="view-container" *ngIf="currentView !== 'home'">
       <button class="back-btn" (click)="setView('home')">← Back</button>
       <app-create-task *ngIf="currentView === 'create'" (done)="setView('home')"></app-create-task>
-      <app-task-list *ngIf="currentView === 'list'"></app-task-list>
-      <app-get-task *ngIf="currentView === 'get'" [claimedTask]="claimedTask" (taskChanged)="onTaskChanged()"></app-get-task>
+      <app-task-list *ngIf="currentView === 'list'" (taskClosed)="onTaskClosed($event)"></app-task-list>
+      <app-get-task *ngIf="currentView === 'get'" [claimedTask]="claimedTask" (taskChanged)="onTaskChanged()" (taskClosed)="onTaskClosed($event)"></app-get-task>
+      <app-gamification *ngIf="currentView === 'gamification'"></app-gamification>
     </div>
   </main>
 
   <app-settings *ngIf="settingsOpen" [isAdmin]="auth.isAdmin" (close)="settingsOpen = false"></app-settings>
+
+  <!-- Gamification result toast -->
+  <div class="gam-toast" *ngIf="gamToast">
+    <div class="gam-toast-points" *ngIf="auth.features.points">
+      <span class="gam-toast-plus">+{{ gamToast.points }}</span>
+      <span class="gam-toast-label">points</span>
+    </div>
+    <div class="gam-toast-achievements" *ngIf="auth.features.achievements && gamToast.newAchievements.length > 0">
+      <span *ngFor="let a of gamToast.newAchievements" class="gam-toast-ach">
+        {{ a.icon }} {{ a.name }} unlocked!
+      </span>
+    </div>
+  </div>
 </div>

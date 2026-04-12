@@ -17,6 +17,7 @@ export class GetTaskComponent implements OnChanges {
   /** If a task is already claimed by the current user, pass it in directly */
   @Input() claimedTask: Task | null = null;
   @Output() taskChanged = new EventEmitter<void>();
+  @Output() taskClosed = new EventEmitter<any>();
 
   state: GetTaskState = 'input';
   availableMinutes: number | null = null;
@@ -86,10 +87,9 @@ export class GetTaskComponent implements OnChanges {
     this.loading = true;
     if (close) {
       this.taskService.updateTask(this.currentTask.id, { status: 'closed' }).subscribe({
-        next: () => {
+        next: (result: any) => {
           this.loading = false;
-          this.showToast('Task done! 🎉', 'success');
-          this.taskChanged.emit();
+          this.taskClosed.emit(result._gamification || null);
           this.reset();
         },
         error: () => { this.loading = false; this.showToast('Failed to update', 'error'); }

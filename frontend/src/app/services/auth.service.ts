@@ -8,6 +8,7 @@ export class AuthService {
   initReady = false;
   loadingMessage = 'Connecting to Authentik…';
   private _isAdmin = false;
+  features = { points: true, streaks: true, achievements: true, leaderboard: true };
 
   constructor(private oauthService: OAuthService) {}
 
@@ -54,7 +55,8 @@ export class AuthService {
       if (res.ok) {
         const data = await res.json();
         this._isAdmin = !!data.isAdmin;
-        console.log('[Auth] isAdmin:', this._isAdmin);
+        if (data.features) this.features = data.features;
+        console.log('[Auth] isAdmin:', this._isAdmin, 'features:', this.features);
       }
     } catch (e) {
       console.warn('[Auth] Could not fetch /me:', e);

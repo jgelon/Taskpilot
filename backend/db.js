@@ -72,6 +72,7 @@ async function init() {
   }
 
   save();
+  initGamification();
 }
 
 function all(sql, params = []) {
@@ -93,3 +94,34 @@ function run(sql, params = []) {
 }
 
 module.exports = { init, all, get, run, save };
+
+// Called from init() — run after tables exist
+function initGamification() {
+  db.run(`
+    CREATE TABLE IF NOT EXISTS user_stats (
+      username TEXT PRIMARY KEY,
+      displayName TEXT,
+      totalPoints INTEGER DEFAULT 0,
+      tasksCompleted INTEGER DEFAULT 0,
+      currentStreak INTEGER DEFAULT 0,
+      longestStreak INTEGER DEFAULT 0,
+      lastCloseDate TEXT,
+      weeklyPoints INTEGER DEFAULT 0,
+      weekStart TEXT
+    )
+  `);
+
+  db.run(`
+    CREATE TABLE IF NOT EXISTS user_achievements (
+      id TEXT PRIMARY KEY,
+      username TEXT NOT NULL,
+      achievementId TEXT NOT NULL,
+      earnedAt TEXT NOT NULL,
+      UNIQUE(username, achievementId)
+    )
+  `);
+
+  // Add claimedAt to tasks if missing (needed for speed run achievement)
+  try { db.run('ALTER TABLE tasks ADD COLUMN claimedAt TEXT'); } catch(_) {}
+  save();
+}

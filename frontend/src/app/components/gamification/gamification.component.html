@@ -1,0 +1,122 @@
+<div class="gam-container">
+  <h2 class="section-title">Stats & Achievements</h2>
+
+  <div class="loading-state" *ngIf="loading">
+    <div class="spinner"></div><span>Loading…</span>
+  </div>
+
+  <ng-container *ngIf="!loading">
+    <!-- Tab bar -->
+    <div class="gam-tabs">
+      <button [class.active]="tab === 'profile'" (click)="tab = 'profile'">Profile</button>
+      <button [class.active]="tab === 'achievements'" (click)="tab = 'achievements'"
+        *ngIf="auth.features.achievements">Achievements</button>
+      <button [class.active]="tab === 'leaderboard'" (click)="tab = 'leaderboard'"
+        *ngIf="auth.features.leaderboard">Leaderboard</button>
+    </div>
+
+    <!-- ── Profile tab ── -->
+    <div *ngIf="tab === 'profile'">
+      <div class="no-stats" *ngIf="!stats">
+        <p>Close your first task to start earning points!</p>
+      </div>
+
+      <ng-container *ngIf="stats">
+        <!-- Points card -->
+        <div class="stat-card points-card" *ngIf="auth.features.points">
+          <div class="stat-row">
+            <div class="stat-block">
+              <div class="stat-value accent">{{ stats.totalPoints | number }}</div>
+              <div class="stat-label">Total Points</div>
+            </div>
+            <div class="stat-block">
+              <div class="stat-value">{{ stats.weeklyPoints | number }}</div>
+              <div class="stat-label">This Week</div>
+            </div>
+            <div class="stat-block">
+              <div class="stat-value">{{ stats.tasksCompleted }}</div>
+              <div class="stat-label">Tasks Done</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Streak card -->
+        <div class="stat-card streak-card" *ngIf="auth.features.streaks">
+          <div class="streak-row">
+            <div class="streak-main">
+              <span class="streak-flame">🔥</span>
+              <div>
+                <div class="streak-value">{{ streakLabel(stats.currentStreak) }}</div>
+                <div class="stat-label">Current streak</div>
+              </div>
+            </div>
+            <div class="streak-best">
+              <div class="streak-value small">{{ stats.longestStreak }}d</div>
+              <div class="stat-label">Best</div>
+            </div>
+          </div>
+          <div class="streak-dots" *ngIf="stats.currentStreak > 0">
+            <span class="streak-dot active" *ngFor="let d of [].constructor(Math.min(stats.currentStreak, 14)); let i = index"
+              [style.animation-delay]="(i * 0.05) + 's'"></span>
+          </div>
+        </div>
+
+        <!-- Recent achievements preview -->
+        <div class="recent-achievements" *ngIf="auth.features.achievements && stats.achievements.length > 0">
+          <div class="section-label">Recent achievements</div>
+          <div class="achievement-pills">
+            <div class="ach-pill" *ngFor="let a of stats.achievements.slice(-4)">
+              <span class="ach-pill-icon">{{ a.icon }}</span>
+              <span class="ach-pill-name">{{ a.name }}</span>
+            </div>
+          </div>
+        </div>
+      </ng-container>
+    </div>
+
+    <!-- ── Achievements tab ── -->
+    <div *ngIf="tab === 'achievements' && auth.features.achievements">
+      <div class="achievements-grid">
+        <div class="ach-card" *ngFor="let a of allAchievements"
+          [class.earned]="earnedIds.has(a.id)"
+          [class.locked]="!earnedIds.has(a.id)">
+          <div class="ach-icon">{{ a.icon }}</div>
+          <div class="ach-info">
+            <div class="ach-name">{{ a.name }}</div>
+            <div class="ach-desc">{{ a.desc }}</div>
+            <div class="ach-earned-at" *ngIf="earnedAchievement(a.id)">
+              Earned {{ formatDate(earnedAchievement(a.id)!.earnedAt!) }}
+            </div>
+          </div>
+          <div class="ach-lock" *ngIf="!earnedIds.has(a.id)">🔒</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ── Leaderboard tab ── -->
+    <div *ngIf="tab === 'leaderboard' && auth.features.leaderboard">
+      <div class="leaderboard-empty" *ngIf="leaderboard.length === 0">
+        <p>No scores yet — close some tasks!</p>
+      </div>
+      <div class="leaderboard-list">
+        <div class="lb-row" *ngFor="let entry of leaderboard"
+          [class.me]="isCurrentUser(entry.username)"
+          [class.top3]="entry.rank <= 3">
+          <span class="lb-rank">{{ rankIcon(entry.rank) }}</span>
+          <div class="lb-user">
+            <span class="lb-name">{{ entry.displayName }}</span>
+            <span class="lb-you" *ngIf="isCurrentUser(entry.username)">you</span>
+          </div>
+          <div class="lb-stats" *ngIf="auth.features.points">
+            <span class="lb-points">{{ entry.totalPoints | number }}</span>
+            <span class="lb-label">pts</span>
+          </div>
+          <div class="lb-meta">
+            <span *ngIf="auth.features.streaks && entry.currentStreak > 0">🔥 {{ entry.currentStreak }}</span>
+            <span>✓ {{ entry.tasksCompleted }}</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </ng-container>
+</div>

@@ -12,7 +12,7 @@ import { TaskService, Task, Category } from '../../services/task.service';
 })
 export class EditTaskComponent implements OnInit {
   @Input() task!: Task;
-  @Output() done = new EventEmitter<void>();
+  @Output() done = new EventEmitter<any>();  // emits gamification result if task closed
   @Output() cancel = new EventEmitter<void>();
 
   name = ''; description = ''; estimatedDuration: number = 0;
@@ -46,7 +46,10 @@ export class EditTaskComponent implements OnInit {
       recurrenceDays: this.recurring === 'custom' ? this.recurrenceDays : null,
       categoryId: this.categoryId || null
     }).subscribe({
-      next: () => { this.showToast('Task updated!', 'success'); setTimeout(() => this.done.emit(), 800); },
+      next: (result: any) => {
+        this.showToast('Task updated!', 'success');
+        setTimeout(() => this.done.emit(result._gamification || null), 800);
+      },
       error: () => { this.loading = false; this.showToast('Failed to save', 'error'); }
     });
   }
