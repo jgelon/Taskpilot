@@ -48,19 +48,29 @@
 
   <div class="task-cards" *ngIf="!loading">
     <div class="task-card" *ngFor="let task of tasks"
-      [class.closed]="task.status === 'closed'" [class.overdue]="isOverdue(task)"
+      [class.closed]="task.status === 'closed'"
+      [class.overdue]="isOverdue(task)"
+      [class.in-progress]="task.claimedBy && task.status === 'open'"
       (click)="openEdit(task)">
       <div class="card-top">
         <span class="priority-badge p{{task.priority}}">P{{task.priority}}</span>
         <span class="task-name">{{ task.name }}</span>
         <span class="recur-badge" *ngIf="recurLabel(task)">↻ {{ recurLabel(task) }}</span>
-        <span class="status-badge" [class]="task.status">{{ task.status }}</span>
+        <span class="in-progress-badge" *ngIf="task.claimedBy && task.status === 'open'">
+          <span class="in-progress-dot"></span> In progress
+        </span>
+        <span class="status-badge" [class]="task.status" *ngIf="!task.claimedBy || task.status === 'closed'">
+          {{ task.status }}
+        </span>
       </div>
       <div class="card-meta">
         <span class="meta-item"><span class="meta-icon">⏱</span> {{ task.estimatedDuration }}m</span>
         <span class="meta-item" *ngIf="task.dueDate" [class.overdue-text]="isOverdue(task)">
           <span class="meta-icon">📅</span> {{ formatDate(task.dueDate) }}
           <span class="overdue-badge" *ngIf="isOverdue(task)">Overdue</span>
+        </span>
+        <span class="meta-item claimed-by" *ngIf="task.claimedBy && task.status === 'open'">
+          <span class="meta-icon">👤</span> {{ task.claimedByName }}
         </span>
         <span class="meta-item closed-by" *ngIf="task.status === 'closed' && task.closedByName">
           <span class="meta-icon">✓</span> {{ task.closedByName }}
