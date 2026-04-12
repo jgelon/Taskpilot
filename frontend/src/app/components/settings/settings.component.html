@@ -16,6 +16,7 @@
   <ng-container *ngIf="isAdmin">
   <div class="settings-tabs">
     <button [class.active]="tab === 'categories'" (click)="tab = 'categories'">🏷 Categories</button>
+    <button [class.active]="tab === 'features'" (click)="tab = 'features'">⚙ Features</button>
     <button [class.active]="tab === 'importexport'" (click)="tab = 'importexport'">⇅ Import / Export</button>
   </div>
 
@@ -85,6 +86,35 @@
         </button>
       </div>
     </div>
+  </div>
+
+  <!-- Features tab -->
+  <div class="tab-content" *ngIf="tab === 'features'">
+    <p class="features-intro">Toggle gamification features. Changes take effect immediately for all users.</p>
+
+    <div class="feature-list">
+      <div class="feature-row" *ngFor="let feat of [
+        { key: 'points',       icon: '⭐', label: 'Points',       desc: 'Earn points when closing tasks. Always calculated, toggle controls visibility.' },
+        { key: 'streaks',      icon: '🔥', label: 'Streaks',      desc: 'Daily close streaks with longest streak tracking.' },
+        { key: 'achievements', icon: '🎖', label: 'Achievements', desc: '12 unlockable badges for milestones and special actions.' },
+        { key: 'leaderboard',  icon: '🏆', label: 'Leaderboard',  desc: 'Weekly and all-time rankings by points scored.' }
+      ]">
+        <div class="feature-info">
+          <span class="feature-icon">{{ feat.icon }}</span>
+          <div>
+            <div class="feature-label">{{ feat.label }}</div>
+            <div class="feature-desc">{{ feat.desc }}</div>
+          </div>
+        </div>
+        <button class="toggle-btn" [class.on]="$any(features)[feat.key]" (click)="toggleFeature($any(feat.key))">
+          <span class="toggle-thumb"></span>
+        </button>
+      </div>
+    </div>
+
+    <button class="btn-primary" (click)="saveFeatures()" [disabled]="!featuresChanged || featuresLoading">
+      {{ featuresLoading ? 'Saving…' : 'Save Changes' }}
+    </button>
   </div>
 
   <!-- Import/Export tab -->

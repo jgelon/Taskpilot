@@ -137,7 +137,7 @@ Browser / Mobile
 | 🔁 Recurring Tasks | Auto-reopens with shifted due date on close. Daily/weekly/monthly/custom. |
 | ⚠️ Overdue Banner | Home screen warning with count of overdue tasks |
 | 🔢 Open Count | Open task count badge on View Tasks home button |
-| ⚙️ Settings Panel | Slide-over (gear icon, top-right, admin only): category management + import/export |
+| ⚙️ Settings Panel | Slide-over (gear icon, top-right, admin only): categories, feature flags, and import/export |
 | ⇅ Import / Export | Export all tasks to CSV with IDs. Import with upsert-by-ID logic. (admin only) |
 | 🔐 Authentication | OIDC login via Authentik. All API calls require a valid Bearer token. |
 | 👥 Role-based access | `taskpilot-admin` group gates Settings. Enforced on both frontend and backend. |
@@ -180,14 +180,18 @@ points = round(base × (1 + streak_bonus) × overdue_penalty)
 
 ### Feature flags
 
-Set in `.env` — change takes effect on container restart (no rebuild needed).
+Feature flags are stored in the database and can be toggled live from the **Settings → Features** tab (admin only) — no restart or rebuild needed.
 
-| Variable | Default | Effect when `false` |
+The `.env` variables below set the **initial** defaults when the database is first created. After that, use the Settings UI to change them.
+
+| Variable | Default | Effect when off |
 |---|---|---|
-| `FEATURE_POINTS` | `true` | Points hidden in UI (still calculated) |
+| `FEATURE_POINTS` | `true` | Points hidden in UI (still calculated and stored) |
 | `FEATURE_STREAKS` | `true` | Streak display hidden |
 | `FEATURE_ACHIEVEMENTS` | `true` | Achievements tab hidden |
-| `FEATURE_LEADERBOARD` | `true` | Leaderboard tab hidden, endpoint returns 403 |
+| `FEATURE_LEADERBOARD` | `true` | Leaderboard tab and API endpoint disabled |
+
+> **Note:** Points are always calculated server-side regardless of the flag, so turning points back on will show the correct accumulated totals.
 
 ---
 

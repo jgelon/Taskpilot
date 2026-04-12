@@ -2,13 +2,15 @@ import { Injectable } from '@angular/core';
 import { OAuthService, AuthConfig } from 'angular-oauth2-oidc';
 import { environment } from '../../environments/environment';
 
+export interface Features { points: boolean; streaks: boolean; achievements: boolean; leaderboard: boolean; }
+
 @Injectable({ providedIn: 'root' })
 export class AuthService {
   initError: string | null = null;
   initReady = false;
   loadingMessage = 'Connecting to Authentik…';
   private _isAdmin = false;
-  features = { points: true, streaks: true, achievements: true, leaderboard: true };
+  features: Features = { points: true, streaks: true, achievements: true, leaderboard: true };
 
   constructor(private oauthService: OAuthService) {}
 

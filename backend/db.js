@@ -73,6 +73,7 @@ async function init() {
 
   save();
   initGamification();
+  initSettings();
 }
 
 function all(sql, params = []) {
@@ -125,3 +126,44 @@ function initGamification() {
   try { db.run('ALTER TABLE tasks ADD COLUMN claimedAt TEXT'); } catch(_) {}
   save();
 }
+
+function initSettings() {
+  db.run(`
+    CREATE TABLE IF NOT EXISTS app_settings (
+      key TEXT PRIMARY KEY,
+      value TEXT NOT NULL
+    )
+  `);
+  // Seed from env vars if not already set
+  const defaults = {
+    feature_points:       process.env.FEATURE_POINTS       ?? 'true',
+    feature_streaks:      process.env.FEATURE_STREAKS      ?? 'true',
+    feature_achievements: process.env.FEATURE_ACHIEVEMENTS ?? 'true',
+    feature_leaderboard:  process.env.FEATURE_LEADERBOARD  ?? 'true',
+  };
+  for (const [key, value] of Object.entries(defaults)) {
+    const existing = get('SELECT value FROM app_settings WHERE key=?', [key]);
+    if (!existing) run('INSERT INTO app_settings (key, value) VALUES (?,?)', [key, value]);
+  }
+  save();
+}
+
+function getSetting(key) {
+  const row = get('SELECT value FROM app_settings WHERE key=?', [key]);
+  return row ? row.value : null;
+}
+
+function setSetting(key, value) {
+  run('INSERT OR REPLACE INTO app_settings (key, value) VALUES (?,?)', [key, String(value)]);
+}
+
+function getFeatures() {
+  return {
+    points:       getSetting('feature_points')       !== 'false',
+    streaks:      getSetting('feature_streaks')      !== 'false',
+    achievements: getSetting('feature_achievements') !== 'false',
+    leaderboard:  getSetting('feature_leaderboard')  !== 'false',
+  };
+}
+
+module.exports = { init, all, get, run, save, getSetting, setSetting, getFeatures };

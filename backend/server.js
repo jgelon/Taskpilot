@@ -14,13 +14,8 @@ const OIDC_CLIENT_ID = process.env.OIDC_CLIENT_ID;
 const FRONTEND_URL = process.env.FRONTEND_URL;
 const ADMIN_GROUP = process.env.ADMIN_GROUP || 'taskpilot-admin';
 
-// ── Feature flags (all default ON) ───────────────────────────────────────────
-const FEATURES = {
-  points:       process.env.FEATURE_POINTS       !== 'false',
-  streaks:      process.env.FEATURE_STREAKS      !== 'false',
-  achievements: process.env.FEATURE_ACHIEVEMENTS !== 'false',
-  leaderboard:  process.env.FEATURE_LEADERBOARD  !== 'false',
-};
+// Feature flags now stored in DB (seeded from env vars on first boot)
+// Read dynamically per request via db.getFeatures()
 
 console.log('=== TaskPilot API starting ===');
 console.log('PORT              :', PORT);
@@ -29,7 +24,7 @@ console.log('AUTHENTIK_INTERNAL:', AUTHENTIK_INTERNAL_URL);
 console.log('OIDC_CLIENT_ID    :', OIDC_CLIENT_ID);
 console.log('FRONTEND_URL      :', FRONTEND_URL);
 console.log('ADMIN_GROUP       :', ADMIN_GROUP);
-console.log('FEATURES          :', JSON.stringify(FEATURES));
+console.log('(features loaded from DB at runtime)');
 console.log('==============================');
 
 app.use(cors({ origin: FRONTEND_URL, credentials: true }));
@@ -141,7 +136,7 @@ app.get('/me', requireAuth, (req, res) => {
     name: req.user.name,
     groups: req.user.groups,
     isAdmin: req.user.isAdmin,
-    features: FEATURES
+    features: db.getFeatures()
   });
 });
 
@@ -433,12 +428,27 @@ app.post('/tasks/import', requireAuth, requireAdmin, (req, res) => {
 // ── Gamification Routes ───────────────────────────────────────────────────────
 app.get('/gamification/me', requireAuth, (req, res) => {
   const stats = gamification.getUserStats(req.user.username);
-  res.json({ stats, features: FEATURES, allAchievements: gamification.getAllAchievements() });
+  res.json({ stats, features: db.getFeatures(), allAchievements: gamification.getAllAchievements() });
 });
 
 app.get('/gamification/leaderboard', requireAuth, (req, res) => {
-  if (!FEATURES.leaderboard) return res.status(403).json({ error: 'Feature disabled' });
+  if (!db.getFeatures().leaderboard) return res.status(403).json({ error: 'Feature disabled' });
   res.json(gamification.getLeaderboard());
+});
+
+// ── App settings routes (admin only) ─────────────────────────────────────────
+app.get('/settings/features', requireAuth, requireAdmin, (req, res) => {
+  res.json(db.getFeatures());
+});
+
+app.put('/settings/features', requireAuth, requireAdmin, (req, res) => {
+  const allowed = ['points', 'streaks', 'achievements', 'leaderboard'];
+  for (const key of allowed) {
+    if (key in req.body) {
+      db.setSetting(`feature_${key}`, req.body[key] ? 'true' : 'false');
+    }
+  }
+  res.json(db.getFeatures());
 });
 
 app.get('/health', (req, res) => res.json({ status: 'ok' }));

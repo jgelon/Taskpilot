@@ -114,4 +114,12 @@ export class TaskService {
       `${this.api}/tasks/import`, { csv }, { headers: this.h() }
     );
   }
+
+  getFeatures(): Observable<any> {
+    return this.http.get<any>(`${this.api}/settings/features`, { headers: this.h() });
+  }
+
+  updateFeatures(features: any): Observable<any> {
+    return this.http.put<any>(`${this.api}/settings/features`, features, { headers: this.h() });
+  }
 }
