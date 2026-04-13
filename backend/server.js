@@ -4,6 +4,7 @@ const { v4: uuidv4 } = require('uuid');
 const crypto = require('crypto');
 const jwksClient = require('jwks-rsa');
 const jwt = require('jsonwebtoken');
+const webpush = require('web-push');
 const db = require('./db');
 const gamification = require('./gamification');
 
@@ -14,9 +15,22 @@ const AUTHENTIK_INTERNAL_URL = process.env.AUTHENTIK_INTERNAL_URL || AUTHENTIK_U
 const OIDC_CLIENT_ID = process.env.OIDC_CLIENT_ID;
 const FRONTEND_URL = process.env.FRONTEND_URL;
 const ADMIN_GROUP = process.env.ADMIN_GROUP || 'taskpilot-admin';
+const VAPID_PUBLIC_KEY = process.env.VAPID_PUBLIC_KEY;
+const VAPID_PRIVATE_KEY = process.env.VAPID_PRIVATE_KEY;
+const VAPID_EMAIL = process.env.VAPID_EMAIL || 'mailto:admin@taskpilot.local';
 
 // Feature flags now stored in DB (seeded from env vars on first boot)
 // Read dynamically per request via db.getFeatures()
+
+// ── VAPID setup for web push ──────────────────────────────────────────────────
+function initWebPush() {
+  if (VAPID_PUBLIC_KEY && VAPID_PRIVATE_KEY) {
+    webpush.setVapidDetails(VAPID_EMAIL, VAPID_PUBLIC_KEY, VAPID_PRIVATE_KEY);
+    console.log('[Push] VAPID configured');
+  } else {
+    console.warn('[Push] VAPID keys not set — push notifications disabled');
+  }
+}
 
 console.log('=== TaskPilot API starting ===');
 console.log('PORT              :', PORT);
@@ -129,7 +143,9 @@ function rowToTask(row) {
     categoryId: row.categoryId || null,
     claimedBy: row.claimedBy || null,
     claimedByName: row.claimedByName || null,
-    claimedAt: row.claimedAt || null
+    claimedAt: row.claimedAt || null,
+    assignedTo: row.assignedTo || null,
+    assignedToName: row.assignedToName || null,
   };
 }
 
@@ -141,12 +157,12 @@ function scheduleNextRecurrence(task) {
   const nextDue = base.toISOString().substring(0, 10);
   db.run(
     `INSERT INTO tasks (id,name,description,estimatedDuration,priority,dueDate,dateAdded,status,
-      createdBy,createdByName,recurring,recurrenceDays,categoryId)
-     VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)`,
+      createdBy,createdByName,recurring,recurrenceDays,categoryId,assignedTo,assignedToName)
+     VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
     [uuidv4(), task.name, task.description, task.estimatedDuration, task.priority,
      nextDue, new Date().toISOString(), 'open',
      task.createdBy, task.createdByName, task.recurring, task.recurrenceDays,
-     task.categoryId || null]
+     task.categoryId || null, task.assignedTo || null, task.assignedToName || null]
   );
   console.log(`[RECUR] Scheduled next "${task.name}" for ${nextDue}`);
 }
@@ -228,7 +244,7 @@ app.get('/tasks', requireAuth, (req, res) => {
 });
 
 app.post('/tasks', requireAuth, (req, res) => {
-  const { name, description, estimatedDuration, priority, dueDate, recurring, recurrenceDays, categoryId } = req.body;
+  const { name, description, estimatedDuration, priority, dueDate, recurring, recurrenceDays, categoryId, assignedTo, assignedToName } = req.body;
   if (!name || !estimatedDuration || !priority)
     return res.status(400).json({ error: 'name, estimatedDuration, and priority are required' });
   if (priority < 1 || priority > 4)
@@ -236,12 +252,13 @@ app.post('/tasks', requireAuth, (req, res) => {
   const id = uuidv4();
   db.run(
     `INSERT INTO tasks (id,name,description,estimatedDuration,priority,dueDate,dateAdded,status,
-      createdBy,createdByName,recurring,recurrenceDays,categoryId)
-     VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)`,
+      createdBy,createdByName,recurring,recurrenceDays,categoryId,assignedTo,assignedToName)
+     VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
     [id, name, description||'', Number(estimatedDuration), Number(priority),
      dueDate||null, new Date().toISOString(), 'open',
      req.user.username, req.user.name,
-     recurring||'none', recurrenceDays||null, categoryId||null]
+     recurring||'none', recurrenceDays||null, categoryId||null,
+     assignedTo||null, assignedToName||null]
   );
   const row = db.get(
     `SELECT t.*, c.name as categoryName, c.color as categoryColor
@@ -253,7 +270,7 @@ app.post('/tasks', requireAuth, (req, res) => {
 app.put('/tasks/:id', requireAuth, (req, res) => {
   const existing = db.get('SELECT * FROM tasks WHERE id = ?', [req.params.id]);
   if (!existing) return res.status(404).json({ error: 'Task not found' });
-  const { name, description, estimatedDuration, priority, dueDate, status, recurring, recurrenceDays, categoryId, claim } = req.body;
+  const { name, description, estimatedDuration, priority, dueDate, status, recurring, recurrenceDays, categoryId, claim, assignedTo, assignedToName } = req.body;
   const u = {
     name: name ?? existing.name,
     description: description ?? existing.description,
@@ -265,7 +282,9 @@ app.put('/tasks/:id', requireAuth, (req, res) => {
     recurring: recurring ?? existing.recurring,
     recurrenceDays: recurrenceDays != null ? Number(recurrenceDays) : existing.recurrenceDays,
     categoryId: categoryId !== undefined ? (categoryId||null) : existing.categoryId,
-    claimedBy: existing.claimedBy, claimedByName: existing.claimedByName, claimedAt: existing.claimedAt
+    claimedBy: existing.claimedBy, claimedByName: existing.claimedByName, claimedAt: existing.claimedAt,
+    assignedTo: assignedTo !== undefined ? (assignedTo||null) : existing.assignedTo,
+    assignedToName: assignedToName !== undefined ? (assignedToName||null) : existing.assignedToName,
   };
 
   // Claim task
@@ -290,10 +309,10 @@ app.put('/tasks/:id', requireAuth, (req, res) => {
   db.run(
     `UPDATE tasks SET name=?,description=?,estimatedDuration=?,priority=?,dueDate=?,status=?,
       closedBy=?,closedByName=?,closedAt=?,recurring=?,recurrenceDays=?,categoryId=?,
-      claimedBy=?,claimedByName=?,claimedAt=? WHERE id=?`,
+      claimedBy=?,claimedByName=?,claimedAt=?,assignedTo=?,assignedToName=? WHERE id=?`,
     [u.name,u.description,u.estimatedDuration,u.priority,u.dueDate,u.status,
      u.closedBy,u.closedByName,u.closedAt,u.recurring,u.recurrenceDays,u.categoryId,
-     u.claimedBy,u.claimedByName,u.claimedAt,req.params.id]
+     u.claimedBy,u.claimedByName,u.claimedAt,u.assignedTo,u.assignedToName,req.params.id]
   );
 
   if (status === 'closed' && existing.status !== 'closed') {
@@ -349,8 +368,9 @@ app.post('/tasks/suggest', requireAuth, (req, res) => {
     `SELECT t.*, c.name as categoryName, c.color as categoryColor
      FROM tasks t LEFT JOIN categories c ON t.categoryId = c.id
      WHERE t.status='open' AND t.estimatedDuration <= ?
-       AND (t.claimedBy IS NULL OR t.claimedBy = ?)`,
-    [availableMinutes, req.user.username]
+       AND (t.claimedBy IS NULL OR t.claimedBy = ?)
+       AND (t.assignedTo IS NULL OR t.assignedTo = ?)`,
+    [availableMinutes, req.user.username, req.user.username]
   ).map(rowToTask).filter(t => !excludeIds.includes(t.id));
   if (!candidates.length) return res.json({ task: null });
   const now = new Date();
@@ -476,6 +496,113 @@ app.delete('/apikeys/:id', requireAuth, requireAdmin, (req, res) => {
   res.json({ success: true });
 });
 
+// ── Users (for assignment dropdown) ──────────────────────────────────────────
+app.get('/users', requireAuth, (req, res) => {
+  // Return all users who have ever interacted with the system
+  const rows = db.all(`
+    SELECT username, displayName as name FROM user_stats
+    UNION
+    SELECT createdBy as username, createdByName as name FROM tasks WHERE createdBy IS NOT NULL
+    GROUP BY username
+    ORDER BY name ASC
+  `);
+  // Deduplicate
+  const seen = new Set();
+  const users = rows.filter(r => {
+    if (!r.username || seen.has(r.username)) return false;
+    seen.add(r.username);
+    return true;
+  });
+  res.json(users);
+});
+
+// ── Push Notification Routes ──────────────────────────────────────────────────
+app.get('/push/vapid-public-key', requireAuth, (req, res) => {
+  if (!VAPID_PUBLIC_KEY) return res.status(503).json({ error: 'Push not configured' });
+  res.json({ publicKey: VAPID_PUBLIC_KEY });
+});
+
+app.post('/push/subscribe', requireAuth, (req, res) => {
+  const { endpoint, keys } = req.body;
+  if (!endpoint || !keys?.p256dh || !keys?.auth)
+    return res.status(400).json({ error: 'Invalid subscription object' });
+  try {
+    db.run(
+      `INSERT OR REPLACE INTO push_subscriptions (id, username, endpoint, p256dh, auth, createdAt)
+       VALUES (COALESCE((SELECT id FROM push_subscriptions WHERE endpoint=?), ?), ?,?,?,?,?)`,
+      [endpoint, uuidv4(), req.user.username, endpoint, keys.p256dh, keys.auth, new Date().toISOString()]
+    );
+    res.json({ success: true });
+  } catch (e) {
+    res.status(500).json({ error: 'Failed to save subscription' });
+  }
+});
+
+app.post('/push/unsubscribe', requireAuth, (req, res) => {
+  const { endpoint } = req.body;
+  if (endpoint) db.run('DELETE FROM push_subscriptions WHERE endpoint=?', [endpoint]);
+  res.json({ success: true });
+});
+
+// ── Push notification sender (called on interval) ─────────────────────────────
+async function sendOverdueNotifications() {
+  if (!VAPID_PUBLIC_KEY || !VAPID_PRIVATE_KEY) return;
+  if (!db.getFeatures().pushNotifications) return;
+
+  const today = new Date().toISOString().substring(0, 10);
+  const overdueTasks = db.all(
+    `SELECT t.*, u.username as assignedUsername
+     FROM tasks t
+     LEFT JOIN (SELECT DISTINCT username FROM push_subscriptions) u
+       ON t.assignedTo = u.username OR t.assignedTo IS NULL
+     WHERE t.status='open' AND t.dueDate IS NOT NULL AND t.dueDate < ?
+     LIMIT 50`, [today]
+  );
+
+  if (overdueTasks.length === 0) return;
+
+  // Group: per-user subscriptions
+  const subs = db.all('SELECT * FROM push_subscriptions');
+  if (subs.length === 0) return;
+
+  const overdueCounts = {};
+  for (const task of overdueTasks) {
+    // Notify assigned user if set, otherwise all subscribers
+    const targets = task.assignedTo ? [task.assignedTo] : subs.map(s => s.username);
+    for (const u of targets) {
+      overdueCounts[u] = (overdueCounts[u] || 0) + 1;
+    }
+  }
+
+  for (const sub of subs) {
+    const count = overdueCounts[sub.username];
+    if (!count) continue;
+    const payload = JSON.stringify({
+      title: 'TaskPilot ⚠️',
+      body: `You have ${count} overdue task${count > 1 ? 's' : ''}`,
+      icon: '/icons/icon-192.png',
+      badge: '/icons/icon-192.png',
+      tag: 'taskpilot-overdue',
+      renotify: false,
+      data: { url: '/' }
+    });
+    try {
+      await webpush.sendNotification(
+        { endpoint: sub.endpoint, keys: { p256dh: sub.p256dh, auth: sub.auth } },
+        payload
+      );
+    } catch (err) {
+      if (err.statusCode === 410 || err.statusCode === 404) {
+        // Subscription expired — remove it
+        db.run('DELETE FROM push_subscriptions WHERE endpoint=?', [sub.endpoint]);
+        console.log('[Push] Removed expired subscription for', sub.username);
+      } else {
+        console.error('[Push] Failed to send to', sub.username, err.message);
+      }
+    }
+  }
+}
+
 // ── Gamification Routes ───────────────────────────────────────────────────────
 app.get('/gamification/me', requireAuth, (req, res) => {
   const stats = gamification.getUserStats(req.user.username);
@@ -507,6 +634,11 @@ app.get('/health', (req, res) => res.json({ status: 'ok' }));
 async function start() {
   await db.init();
   try { await initJwks(); } catch(e) { console.error('JWKS init failed:', e.message); }
+  initWebPush();
+  // Send overdue push notifications once per hour
+  setInterval(sendOverdueNotifications, 60 * 60 * 1000);
+  // Also check shortly after startup
+  setTimeout(sendOverdueNotifications, 30000);
   app.listen(PORT, () => console.log(`TaskPilot API running on port ${PORT}`));
 }
 start();

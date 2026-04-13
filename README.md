@@ -75,6 +75,9 @@ All configuration lives in a single `.env` file next to `docker-compose.yml`.
 | `AUTHENTIK_INTERNAL_URL` | Internal Authentik URL for backend JWKS fetch (bypasses Traefik). | `http://authentik-server:9000` |
 | `OIDC_CLIENT_ID` | Client ID from your Authentik OIDC application. | `abc123xyz` |
 | `ADMIN_GROUP` | Authentik group name that grants Settings access. Default: `taskpilot-admin`. | `taskpilot-admin` |
+| `VAPID_PUBLIC_KEY` | VAPID public key for Web Push. Generate with `node -e "require('web-push').generateVAPIDKeys() |> console.log"`. | `BOos...` |
+| `VAPID_PRIVATE_KEY` | VAPID private key. Keep secret. | `_TGq...` |
+| `VAPID_EMAIL` | Contact email sent with push requests. | `mailto:you@domain.com` |
 
 ---
 
@@ -142,6 +145,8 @@ Browser / Mobile
 | 🔐 Authentication | OIDC login via Authentik. All API calls require a valid Bearer token. |
 | 👥 Role-based access | `taskpilot-admin` group gates Settings. Enforced on both frontend and backend. |
 | 🔑 API Keys | Static API keys for service accounts (e.g. Home Assistant). Generated and revoked in Settings → API Keys. |
+| 👤 Task Assignment | Assign tasks to specific users. Assigned tasks are excluded from others' Get a Task suggestions. Toggle in Settings → Features. |
+| 🔔 Push Notifications | Browser push notifications when tasks become overdue (hourly check). Requires VAPID keys. Toggle in Settings → Features. |
 | 🏠 Home Assistant | Custom integration with two sensors: open task count and overdue task count. |
 | 🏆 Points | Earn points on task close: `duration × priority_multiplier`. Streak and overdue bonuses apply. Always calculated; hidden when `FEATURE_POINTS=false`. |
 | 🔥 Streaks | Daily close streak with longest streak tracking. Visible when `FEATURE_STREAKS=true`. |
@@ -192,6 +197,8 @@ The `.env` variables below set the **initial** defaults when the database is fir
 | `FEATURE_STREAKS` | `true` | Streak display hidden |
 | `FEATURE_ACHIEVEMENTS` | `true` | Achievements tab hidden |
 | `FEATURE_LEADERBOARD` | `true` | Leaderboard tab and API endpoint disabled |
+| `FEATURE_ASSIGNMENT` | `true` | Assignee dropdown hidden; assigned tasks excluded from suggestions |
+| `FEATURE_PUSH_NOTIFICATIONS` | `true` | Push subscription + overdue sender disabled |
 
 > **Note:** Points are always calculated server-side regardless of the flag, so turning points back on will show the correct accumulated totals.
 
@@ -273,6 +280,10 @@ The `/tasks/stats` endpoint additionally accepts an `X-API-Key` header as an alt
 | `POST` | `/tasks/suggest` | user | Best task for available time |
 | `GET` | `/tasks/export` | 🔒 admin | Download CSV |
 | `POST` | `/tasks/import` | 🔒 admin | Upload CSV (upsert by ID) |
+| `GET` | `/users` | user | List all users who have interacted with the system (for assignment dropdown) |
+| `GET` | `/push/vapid-public-key` | user | Get the VAPID public key for push subscription |
+| `POST` | `/push/subscribe` | user | Save a push subscription |
+| `POST` | `/push/unsubscribe` | user | Remove a push subscription |
 | `GET` | `/apikeys` | 🔒 admin | List API keys (names + prefixes only, never full keys) |
 | `POST` | `/apikeys` | 🔒 admin | Generate a new API key (full key returned once) |
 | `DELETE` | `/apikeys/:id` | 🔒 admin | Revoke an API key |

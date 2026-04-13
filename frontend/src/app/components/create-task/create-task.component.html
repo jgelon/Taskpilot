@@ -38,6 +38,14 @@
         </select>
       </div>
     </div>
+    <div class="form-group" *ngIf="auth.features.assignment">
+      <label>Assign to</label>
+      <select [ngModel]="assignedTo" (ngModelChange)="onAssigneeChange($event)" name="assignedTo">
+        <option [ngValue]="null">Unassigned</option>
+        <option *ngFor="let u of users" [value]="u.username">{{ u.name }}</option>
+      </select>
+    </div>
+
     <div class="form-group">
       <label>Recurring</label>
       <select [(ngModel)]="recurring" name="recurring">

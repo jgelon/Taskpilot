@@ -7,6 +7,7 @@ import { SettingsComponent } from './components/settings/settings.component';
 import { GamificationComponent } from './components/gamification/gamification.component';
 import { AuthService } from './services/auth.service';
 import { TaskService, TaskStats } from './services/task.service';
+import { PushService } from './services/push.service';
 import { OAuthService } from 'angular-oauth2-oidc';
 import { Subscription } from 'rxjs';
 import { filter } from 'rxjs/operators';
@@ -33,14 +34,18 @@ export class AppComponent implements OnInit, OnDestroy {
   constructor(
     public auth: AuthService,
     private taskService: TaskService,
-    private oauthService: OAuthService
+    private oauthService: OAuthService,
+    private pushService: PushService
   ) {}
 
   ngOnInit() {
-    if (this.auth.isLoggedIn) this.loadStats();
+    if (this.auth.isLoggedIn) {
+      this.loadStats();
+      this.pushService.init();
+    }
     this.sub = this.oauthService.events
       .pipe(filter(e => e.type === 'token_received' || e.type === 'token_refreshed'))
-      .subscribe(() => this.loadStats());
+      .subscribe(() => { this.loadStats(); this.pushService.init(); });
   }
 
   ngOnDestroy() { this.sub?.unsubscribe(); }

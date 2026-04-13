@@ -7,6 +7,8 @@ export interface Features {
   streaks: boolean;
   achievements: boolean;
   leaderboard: boolean;
+  assignment: boolean;
+  pushNotifications: boolean;
 }
 
 export type AuthState = 'loading' | 'ready' | 'reauthing' | 'error';
@@ -16,7 +18,7 @@ export class AuthService {
   state: AuthState = 'loading';
   loadingMessage = 'Connecting to Authentik…';
   initError: string | null = null;
-  features: Features = { points: true, streaks: true, achievements: true, leaderboard: true };
+  features: Features = { points: true, streaks: true, achievements: true, leaderboard: true, assignment: true, pushNotifications: true };
   private _isAdmin = false;
 
   constructor(private oauthService: OAuthService, private ngZone: NgZone) {}

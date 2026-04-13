@@ -66,6 +66,8 @@ async function init() {
     'ALTER TABLE tasks ADD COLUMN claimedBy TEXT',
     'ALTER TABLE tasks ADD COLUMN claimedByName TEXT',
     'ALTER TABLE tasks ADD COLUMN claimedAt TEXT',
+    'ALTER TABLE tasks ADD COLUMN assignedTo TEXT',
+    'ALTER TABLE tasks ADD COLUMN assignedToName TEXT',
   ];
   for (const sql of migrations) {
     try { db.run(sql); } catch (_) { /* column already exists */ }
@@ -75,6 +77,7 @@ async function init() {
   initGamification();
   initSettings();
   initApiKeys();
+  initPushSubscriptions();
 }
 
 function all(sql, params = []) {
@@ -137,10 +140,12 @@ function initSettings() {
   `);
   // Seed from env vars if not already set
   const defaults = {
-    feature_points:       process.env.FEATURE_POINTS       ?? 'true',
-    feature_streaks:      process.env.FEATURE_STREAKS      ?? 'true',
-    feature_achievements: process.env.FEATURE_ACHIEVEMENTS ?? 'true',
-    feature_leaderboard:  process.env.FEATURE_LEADERBOARD  ?? 'true',
+    feature_points:               process.env.FEATURE_POINTS               ?? 'true',
+    feature_streaks:              process.env.FEATURE_STREAKS              ?? 'true',
+    feature_achievements:         process.env.FEATURE_ACHIEVEMENTS         ?? 'true',
+    feature_leaderboard:          process.env.FEATURE_LEADERBOARD          ?? 'true',
+    feature_assignment:           process.env.FEATURE_ASSIGNMENT           ?? 'true',
+    feature_push_notifications:   process.env.FEATURE_PUSH_NOTIFICATIONS   ?? 'true',
   };
   for (const [key, value] of Object.entries(defaults)) {
     const existing = get('SELECT value FROM app_settings WHERE key=?', [key]);
@@ -160,11 +165,27 @@ function setSetting(key, value) {
 
 function getFeatures() {
   return {
-    points:       getSetting('feature_points')       !== 'false',
-    streaks:      getSetting('feature_streaks')      !== 'false',
-    achievements: getSetting('feature_achievements') !== 'false',
-    leaderboard:  getSetting('feature_leaderboard')  !== 'false',
+    points:             getSetting('feature_points')             !== 'false',
+    streaks:            getSetting('feature_streaks')            !== 'false',
+    achievements:       getSetting('feature_achievements')       !== 'false',
+    leaderboard:        getSetting('feature_leaderboard')        !== 'false',
+    assignment:         getSetting('feature_assignment')         !== 'false',
+    pushNotifications:  getSetting('feature_push_notifications') !== 'false',
   };
+}
+
+function initPushSubscriptions() {
+  db.run(`
+    CREATE TABLE IF NOT EXISTS push_subscriptions (
+      id TEXT PRIMARY KEY,
+      username TEXT NOT NULL,
+      endpoint TEXT NOT NULL UNIQUE,
+      p256dh TEXT NOT NULL,
+      auth TEXT NOT NULL,
+      createdAt TEXT NOT NULL
+    )
+  `);
+  save();
 }
 
 function initApiKeys() {
@@ -181,5 +202,5 @@ function initApiKeys() {
   save();
 }
 
-module.exports = { init, all, get, run, save, getSetting, setSetting, getFeatures, initApiKeys };
+module.exports = { init, all, get, run, save, getSetting, setSetting, getFeatures, initApiKeys, initPushSubscriptions };
 // (appended — api_keys table)

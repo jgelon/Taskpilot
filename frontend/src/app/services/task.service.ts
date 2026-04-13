@@ -32,6 +32,8 @@ export interface Task {
   claimedBy: string | null;
   claimedByName: string | null;
   claimedAt: string | null;
+  assignedTo: string | null;
+  assignedToName: string | null;
 }
 
 export interface TaskStats {
@@ -41,12 +43,14 @@ export interface TaskStats {
 }
 export interface CreateTaskDto {
   name: string; description?: string; estimatedDuration: number; priority: number;
-  dueDate?: string | null; recurring?: string; recurrenceDays?: number | null; categoryId?: string | null;
+  dueDate?: string | null; recurring?: string; recurrenceDays?: number | null;
+  categoryId?: string | null; assignedTo?: string | null; assignedToName?: string | null;
 }
 export interface UpdateTaskDto {
   name?: string; description?: string; estimatedDuration?: number; priority?: number;
   dueDate?: string | null; status?: 'open' | 'closed'; recurring?: string;
   recurrenceDays?: number | null; categoryId?: string | null;
+  assignedTo?: string | null; assignedToName?: string | null;
 }
 export type SortField = 'dateAdded' | 'priority' | 'dueDate' | 'name' | 'estimatedDuration';
 export type SortOrder = 'asc' | 'desc';
@@ -113,6 +117,22 @@ export class TaskService {
     return this.http.post<{ created: number; updated: number; skipped: number; errors: string[] }>(
       `${this.api}/tasks/import`, { csv }, { headers: this.h() }
     );
+  }
+
+  // Users
+  getUsers(): Observable<{username: string; name: string}[]> {
+    return this.http.get<{username: string; name: string}[]>(`${this.api}/users`, { headers: this.h() });
+  }
+
+  // Push notifications
+  getVapidPublicKey(): Observable<{publicKey: string}> {
+    return this.http.get<{publicKey: string}>(`${this.api}/push/vapid-public-key`, { headers: this.h() });
+  }
+  subscribePush(subscription: PushSubscriptionJSON): Observable<any> {
+    return this.http.post(`${this.api}/push/subscribe`, subscription, { headers: this.h() });
+  }
+  unsubscribePush(endpoint: string): Observable<any> {
+    return this.http.post(`${this.api}/push/unsubscribe`, { endpoint }, { headers: this.h() });
   }
 
   getFeatures(): Observable<any> {

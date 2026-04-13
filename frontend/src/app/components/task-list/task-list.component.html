@@ -75,6 +75,9 @@
         <span class="meta-item closed-by" *ngIf="task.status === 'closed' && task.closedByName">
           <span class="meta-icon">✓</span> {{ task.closedByName }}
         </span>
+        <span class="meta-item assigned-to" *ngIf="task.assignedToName && task.status === 'open'">
+          <span class="meta-icon">👤</span> {{ task.assignedToName }}
+        </span>
       </div>
       <!-- Category badge -->
       <div class="card-footer" *ngIf="task.categoryName">

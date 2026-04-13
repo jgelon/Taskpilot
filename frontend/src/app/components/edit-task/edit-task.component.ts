@@ -2,6 +2,7 @@ import { Component, Input, Output, EventEmitter, OnInit } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { TaskService, Task, Category } from '../../services/task.service';
+import { AuthService } from '../../services/auth.service';
 
 @Component({
   selector: 'app-edit-task',
@@ -19,11 +20,14 @@ export class EditTaskComponent implements OnInit {
   priority: number = 2; dueDate = ''; status: 'open' | 'closed' = 'open';
   recurring = 'none'; recurrenceDays: number | null = null;
   categoryId: string | null = null; categories: Category[] = [];
+  assignedTo: string | null = null;
+  assignedToName: string | null = null;
+  users: {username: string; name: string}[] = [];
 
   loading = false; confirmDelete = false;
   toast: { msg: string; type: string } | null = null;
 
-  constructor(private taskService: TaskService) {}
+  constructor(private taskService: TaskService, public auth: AuthService) {}
 
   ngOnInit() {
     this.name = this.task.name; this.description = this.task.description || '';
@@ -32,6 +36,7 @@ export class EditTaskComponent implements OnInit {
     this.status = this.task.status; this.recurring = this.task.recurring || 'none';
     this.recurrenceDays = this.task.recurrenceDays; this.categoryId = this.task.categoryId;
     this.taskService.getCategories().subscribe({ next: c => this.categories = c, error: () => {} });
+    this.taskService.getUsers().subscribe({ next: u => this.users = u, error: () => {} });
   }
 
   get isValid() { return this.name.trim() && this.estimatedDuration > 0; }
@@ -44,7 +49,9 @@ export class EditTaskComponent implements OnInit {
       estimatedDuration: this.estimatedDuration, priority: this.priority,
       dueDate: this.dueDate || null, status: this.status, recurring: this.recurring,
       recurrenceDays: this.recurring === 'custom' ? this.recurrenceDays : null,
-      categoryId: this.categoryId || null
+      categoryId: this.categoryId || null,
+      assignedTo: this.assignedTo || null,
+      assignedToName: this.assignedToName || null
     }).subscribe({
       next: (result: any) => {
         this.showToast('Task updated!', 'success');
@@ -63,6 +70,13 @@ export class EditTaskComponent implements OnInit {
       next: () => this.done.emit(),
       error: () => { this.loading = false; this.showToast('Failed to delete', 'error'); }
     });
+  }
+
+  onAssigneeChange(username: string) {
+    if (!username) { this.assignedTo = null; this.assignedToName = null; return; }
+    const user = this.users.find(u => u.username === username);
+    this.assignedTo = username;
+    this.assignedToName = user?.name || username;
   }
 
   showToast(msg: string, type: string) {

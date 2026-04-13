@@ -95,10 +95,12 @@
 
     <div class="feature-list">
       <div class="feature-row" *ngFor="let feat of [
-        { key: 'points',       icon: '⭐', label: 'Points',       desc: 'Earn points when closing tasks. Always calculated, toggle controls visibility.' },
-        { key: 'streaks',      icon: '🔥', label: 'Streaks',      desc: 'Daily close streaks with longest streak tracking.' },
-        { key: 'achievements', icon: '🎖', label: 'Achievements', desc: '12 unlockable badges for milestones and special actions.' },
-        { key: 'leaderboard',  icon: '🏆', label: 'Leaderboard',  desc: 'Weekly and all-time rankings by points scored.' }
+        { key: 'points',             icon: '⭐', label: 'Points',               desc: 'Earn points when closing tasks. Always calculated, toggle controls visibility.' },
+        { key: 'streaks',            icon: '🔥', label: 'Streaks',              desc: 'Daily close streaks with longest streak tracking.' },
+        { key: 'achievements',       icon: '🎖', label: 'Achievements',         desc: '12 unlockable badges for milestones and special actions.' },
+        { key: 'leaderboard',        icon: '🏆', label: 'Leaderboard',          desc: 'Weekly and all-time rankings by points scored.' },
+        { key: 'assignment',         icon: '👤', label: 'Task Assignment',       desc: 'Assign tasks to specific users. Assigned tasks are excluded from others\' suggestions.' },
+        { key: 'pushNotifications',  icon: '🔔', label: 'Push Notifications',   desc: 'Browser push notifications when tasks become overdue. Requires VAPID keys in .env.' }
       ]">
         <div class="feature-info">
           <span class="feature-icon">{{ feat.icon }}</span>
