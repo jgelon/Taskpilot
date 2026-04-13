@@ -44,7 +44,7 @@
         <span class="user-name">{{ auth.userProfile.name }}</span>
       </div>
       <button class="icon-header-btn trophy-btn" *ngIf="anyGamificationEnabled" (click)="setView('gamification')" title="Stats &amp; Achievements">🏆</button>
-      <button class="icon-header-btn" *ngIf="auth.isAdmin" (click)="settingsOpen = true" title="Settings">⚙</button>
+      <button class="icon-header-btn" *ngIf="auth.isAdmin" (click)="openSettings()" title="Settings">⚙</button>
       <button class="icon-header-btn logout" (click)="auth.logout()" title="Sign out">⏻</button>
     </div>
   </header>

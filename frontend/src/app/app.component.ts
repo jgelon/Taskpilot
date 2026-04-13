@@ -1,4 +1,4 @@
-import { Component, OnInit, OnDestroy } from '@angular/core';
+import { Component, OnInit, OnDestroy, HostListener } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { CreateTaskComponent } from './components/create-task/create-task.component';
 import { TaskListComponent } from './components/task-list/task-list.component';
@@ -27,7 +27,6 @@ export class AppComponent implements OnInit, OnDestroy {
   stats: TaskStats | null = null;
   statsLoading = true;
   window = window;
-  // Gamification toast
   gamToast: { points: number; newAchievements: any[] } | null = null;
   private sub: Subscription | null = null;
 
@@ -46,9 +45,37 @@ export class AppComponent implements OnInit, OnDestroy {
     this.sub = this.oauthService.events
       .pipe(filter(e => e.type === 'token_received' || e.type === 'token_refreshed'))
       .subscribe(() => { this.loadStats(); this.pushService.init(); });
+
+    // Seed an initial history entry so the very first back press goes home
+    // rather than leaving the app
+    history.replaceState({ view: 'home', settings: false }, '');
+
+    // Handle browser/OS back button
+    window.addEventListener('popstate', this.onPopState);
   }
 
-  ngOnDestroy() { this.sub?.unsubscribe(); }
+  ngOnDestroy() {
+    this.sub?.unsubscribe();
+    window.removeEventListener('popstate', this.onPopState);
+  }
+
+  // Arrow function so `this` is bound correctly when used as an event listener
+  private onPopState = (event: PopStateEvent) => {
+    const state: { view: View; settings: boolean } = event.state || { view: 'home', settings: false };
+
+    // Close settings panel first if open — don't change the view yet
+    if (this.settingsOpen) {
+      this.settingsOpen = false;
+      // Push a new entry so the next back press goes to the view behind settings
+      history.pushState({ view: this.currentView, settings: false }, '');
+      return;
+    }
+
+    this.currentView = state.view ?? 'home';
+    this.settingsOpen = state.settings ?? false;
+
+    if (this.currentView === 'home') this.loadStats();
+  };
 
   loadStats() {
     this.statsLoading = true;
@@ -66,9 +93,31 @@ export class AppComponent implements OnInit, OnDestroy {
   }
 
   setView(view: View) {
-    this.currentView = view;
+    const wasHome = this.currentView === 'home' && !this.settingsOpen;
+
     this.settingsOpen = false;
-    if (view === 'home') this.loadStats();
+
+    if (view === 'home') {
+      // Going home — pop back to root state (don't push)
+      this.currentView = 'home';
+      history.replaceState({ view: 'home', settings: false }, '');
+      this.loadStats();
+      return;
+    }
+
+    // Push a new history entry for non-home views
+    // so back button returns to the previous state
+    if (!wasHome) {
+      history.pushState({ view: this.currentView, settings: false }, '');
+    }
+    this.currentView = view;
+    history.pushState({ view, settings: false }, '');
+  }
+
+  openSettings() {
+    // Push a history entry so back closes settings
+    history.pushState({ view: this.currentView, settings: true }, '');
+    this.settingsOpen = true;
   }
 
   onTaskChanged() { this.loadStats(); }
