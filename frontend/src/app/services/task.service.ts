@@ -122,4 +122,20 @@ export class TaskService {
   updateFeatures(features: any): Observable<any> {
     return this.http.put<any>(`${this.api}/settings/features`, features, { headers: this.h() });
   }
+
+  // API Keys
+  getApiKeys(): Observable<ApiKey[]> {
+    return this.http.get<ApiKey[]>(`${this.api}/apikeys`, { headers: this.h() });
+  }
+  createApiKey(name: string): Observable<ApiKeyCreated> {
+    return this.http.post<ApiKeyCreated>(`${this.api}/apikeys`, { name }, { headers: this.h() });
+  }
+  deleteApiKey(id: string): Observable<any> {
+    return this.http.delete(`${this.api}/apikeys/${id}`, { headers: this.h() });
+  }
 }
+
+export interface ApiKey {
+  id: string; name: string; key_prefix: string; createdAt: string; lastUsedAt: string | null;
+}
+export interface ApiKeyCreated extends ApiKey { key: string; }

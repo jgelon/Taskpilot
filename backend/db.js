@@ -74,6 +74,7 @@ async function init() {
   save();
   initGamification();
   initSettings();
+  initApiKeys();
 }
 
 function all(sql, params = []) {
@@ -166,4 +167,19 @@ function getFeatures() {
   };
 }
 
-module.exports = { init, all, get, run, save, getSetting, setSetting, getFeatures };
+function initApiKeys() {
+  db.run(`
+    CREATE TABLE IF NOT EXISTS api_keys (
+      id TEXT PRIMARY KEY,
+      name TEXT NOT NULL,
+      key_hash TEXT NOT NULL UNIQUE,
+      key_prefix TEXT NOT NULL,
+      createdAt TEXT NOT NULL,
+      lastUsedAt TEXT
+    )
+  `);
+  save();
+}
+
+module.exports = { init, all, get, run, save, getSetting, setSetting, getFeatures, initApiKeys };
+// (appended — api_keys table)

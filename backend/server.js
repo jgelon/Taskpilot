@@ -1,6 +1,7 @@
 const express = require('express');
 const cors = require('cors');
 const { v4: uuidv4 } = require('uuid');
+const crypto = require('crypto');
 const jwksClient = require('jwks-rsa');
 const jwt = require('jsonwebtoken');
 const db = require('./db');
@@ -29,6 +30,7 @@ console.log('==============================');
 
 app.use(cors({ origin: FRONTEND_URL, credentials: true }));
 app.use(express.json());
+app.use(apiKeyAuth); // Check for API key on every request before OIDC
 
 // ── JWKS ──────────────────────────────────────────────────────────────────────
 let jwks;
@@ -95,6 +97,26 @@ function requireAdmin(req, res, next) {
     return res.status(403).json({ error: 'Forbidden', detail: `Requires membership of the '${ADMIN_GROUP}' group` });
   }
   next();
+}
+
+// ── API key middleware (for service accounts like Home Assistant) ─────────────
+function apiKeyAuth(req, res, next) {
+  const key = req.headers['x-api-key'];
+  if (!key) return next(); // No key provided — fall through to OIDC auth
+  const hash = crypto.createHash('sha256').update(key).digest('hex');
+  const row = db.get('SELECT * FROM api_keys WHERE key_hash=?', [hash]);
+  if (!row) return res.status(401).json({ error: 'Invalid API key' });
+  // Update last used timestamp (fire-and-forget)
+  db.run('UPDATE api_keys SET lastUsedAt=? WHERE id=?', [new Date().toISOString(), row.id]);
+  req.user = { sub: 'apikey', username: `apikey:${row.name}`, name: row.name, groups: [], isAdmin: false };
+  req.isApiKey = true;
+  next();
+}
+
+// Routes that allow either OIDC or API key
+function requireAuthOrKey(req, res, next) {
+  if (req.isApiKey) return next(); // Already authenticated via API key
+  requireAuth(req, res, next);
 }
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
@@ -299,7 +321,7 @@ app.delete('/tasks/:id', requireAuth, (req, res) => {
   res.json({ success: true });
 });
 
-app.get('/tasks/stats', requireAuth, (req, res) => {
+app.get('/tasks/stats', requireAuthOrKey, (req, res) => {
   const now = new Date().toISOString().substring(0, 10);
   const overdue = db.get(`SELECT COUNT(*) as count FROM tasks WHERE status='open' AND dueDate IS NOT NULL AND dueDate < ?`, [now]);
   const open = db.get(`SELECT COUNT(*) as count FROM tasks WHERE status='open'`);
@@ -423,6 +445,35 @@ app.post('/tasks/import', requireAuth, requireAdmin, (req, res) => {
     } catch(err) { skipped++; errors.push(`Row ${i+1}: ${err.message}`); }
   }
   res.json({ created, updated, skipped, errors });
+});
+
+// ── API Key Management (admin only) ──────────────────────────────────────────
+app.get('/apikeys', requireAuth, requireAdmin, (req, res) => {
+  const keys = db.all('SELECT id, name, key_prefix, createdAt, lastUsedAt FROM api_keys ORDER BY createdAt DESC');
+  res.json(keys);
+});
+
+app.post('/apikeys', requireAuth, requireAdmin, (req, res) => {
+  const { name } = req.body;
+  if (!name?.trim()) return res.status(400).json({ error: 'name is required' });
+  // Generate a secure random key with a recognisable prefix
+  const rawKey = `tp_${crypto.randomBytes(32).toString('hex')}`;
+  const hash = crypto.createHash('sha256').update(rawKey).digest('hex');
+  const prefix = rawKey.substring(0, 10);
+  const id = uuidv4();
+  db.run(
+    'INSERT INTO api_keys (id, name, key_hash, key_prefix, createdAt) VALUES (?,?,?,?,?)',
+    [id, name.trim(), hash, prefix, new Date().toISOString()]
+  );
+  // Return the raw key ONCE — it cannot be retrieved again
+  res.status(201).json({ id, name: name.trim(), key: rawKey, key_prefix: prefix, createdAt: new Date().toISOString() });
+});
+
+app.delete('/apikeys/:id', requireAuth, requireAdmin, (req, res) => {
+  if (!db.get('SELECT id FROM api_keys WHERE id=?', [req.params.id]))
+    return res.status(404).json({ error: 'API key not found' });
+  db.run('DELETE FROM api_keys WHERE id=?', [req.params.id]);
+  res.json({ success: true });
 });
 
 // ── Gamification Routes ───────────────────────────────────────────────────────

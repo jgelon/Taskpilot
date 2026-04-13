@@ -1,11 +1,11 @@
 import { Component, OnInit, Output, EventEmitter, Input } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
-import { TaskService, Category } from '../../services/task.service';
+import { TaskService, Category, ApiKey, ApiKeyCreated } from '../../services/task.service';
 import { Features } from '../../services/auth.service';
 import { ImportExportComponent } from '../import-export/import-export.component';
 
-type SettingsTab = 'categories' | 'features' | 'importexport';
+type SettingsTab = 'categories' | 'features' | 'apikeys' | 'importexport';
 
 @Component({
   selector: 'app-settings',
@@ -36,6 +36,14 @@ export class SettingsComponent implements OnInit {
   confirmDeleteId: string | null = null;
   toast: { msg: string; type: string } | null = null;
 
+  // API Keys
+  apiKeys: ApiKey[] = [];
+  apiKeysLoading = false;
+  newKeyName = '';
+  addKeyLoading = false;
+  newlyCreatedKey: ApiKeyCreated | null = null;
+  confirmDeleteKeyId: string | null = null;
+
   // Feature flags
   features: Features = { points: true, streaks: true, achievements: true, leaderboard: true };
   featuresLoading = false;
@@ -51,6 +59,7 @@ export class SettingsComponent implements OnInit {
   ngOnInit() {
     this.loadCategories();
     this.loadFeatures();
+    this.loadApiKeys();
   }
 
   loadFeatures() {
@@ -142,6 +151,51 @@ export class SettingsComponent implements OnInit {
       },
       error: () => this.showToast('Failed to delete', 'error')
     });
+  }
+
+  loadApiKeys() {
+    this.apiKeysLoading = true;
+    this.taskService.getApiKeys().subscribe({
+      next: keys => { this.apiKeys = keys; this.apiKeysLoading = false; },
+      error: () => { this.apiKeysLoading = false; this.showToast('Failed to load API keys', 'error'); }
+    });
+  }
+
+  createApiKey() {
+    if (!this.newKeyName.trim() || this.addKeyLoading) return;
+    this.addKeyLoading = true;
+    this.taskService.createApiKey(this.newKeyName.trim()).subscribe({
+      next: key => {
+        this.newlyCreatedKey = key;
+        this.apiKeys.unshift({ id: key.id, name: key.name, key_prefix: key.key_prefix, createdAt: key.createdAt, lastUsedAt: null });
+        this.newKeyName = '';
+        this.addKeyLoading = false;
+      },
+      error: () => { this.addKeyLoading = false; this.showToast('Failed to create key', 'error'); }
+    });
+  }
+
+  dismissNewKey() { this.newlyCreatedKey = null; }
+
+  copyKey(key: string) {
+    navigator.clipboard.writeText(key).then(() => this.showToast('Copied to clipboard!', 'success'));
+  }
+
+  deleteApiKey(id: string) {
+    if (this.confirmDeleteKeyId !== id) { this.confirmDeleteKeyId = id; return; }
+    this.taskService.deleteApiKey(id).subscribe({
+      next: () => {
+        this.apiKeys = this.apiKeys.filter(k => k.id !== id);
+        this.confirmDeleteKeyId = null;
+        this.showToast('API key revoked', 'success');
+      },
+      error: () => this.showToast('Failed to revoke key', 'error')
+    });
+  }
+
+  formatDate(d: string | null) {
+    if (!d) return 'Never';
+    return new Date(d).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' });
   }
 
   showToast(msg: string, type: string) {

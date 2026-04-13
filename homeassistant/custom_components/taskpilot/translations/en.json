@@ -1,0 +1,23 @@
+{
+  "config": {
+    "step": {
+      "user": {
+        "title": "Connect to TaskPilot",
+        "description": "Enter your TaskPilot API details. Generate an API key in TaskPilot → Settings → API Keys.",
+        "data": {
+          "name": "Instance name",
+          "api_url": "API URL (e.g. https://todo.your-domain.com/api)",
+          "api_key": "API Key",
+          "scan_interval": "Poll interval (seconds, min 30)"
+        }
+      }
+    },
+    "error": {
+      "cannot_connect": "Cannot connect to TaskPilot. Check the URL and that the service is running.",
+      "invalid_auth": "Invalid API key. Generate one in TaskPilot → Settings → API Keys."
+    },
+    "abort": {
+      "already_configured": "This TaskPilot instance is already configured."
+    }
+  }
+}

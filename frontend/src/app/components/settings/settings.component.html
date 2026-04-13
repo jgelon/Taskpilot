@@ -17,6 +17,7 @@
   <div class="settings-tabs">
     <button [class.active]="tab === 'categories'" (click)="tab = 'categories'">🏷 Categories</button>
     <button [class.active]="tab === 'features'" (click)="tab = 'features'">⚙ Features</button>
+    <button [class.active]="tab === 'apikeys'" (click)="tab = 'apikeys'">🔑 API Keys</button>
     <button [class.active]="tab === 'importexport'" (click)="tab = 'importexport'">⇅ Import / Export</button>
   </div>
 
@@ -115,6 +116,64 @@
     <button class="btn-primary" (click)="saveFeatures()" [disabled]="!featuresChanged || featuresLoading">
       {{ featuresLoading ? 'Saving…' : 'Save Changes' }}
     </button>
+  </div>
+
+  <!-- API Keys tab -->
+  <div class="tab-content" *ngIf="tab === 'apikeys'">
+    <p class="features-intro">API keys allow external services like Home Assistant to read task stats without OIDC login. Keys are shown once on creation.</p>
+
+    <!-- Newly created key banner -->
+    <div class="new-key-banner" *ngIf="newlyCreatedKey">
+      <div class="new-key-header">
+        <span class="new-key-title">🔑 New key created — copy it now!</span>
+        <span class="new-key-warn">This is the only time you'll see it.</span>
+      </div>
+      <div class="new-key-value">
+        <code>{{ newlyCreatedKey.key }}</code>
+        <button class="copy-btn" (click)="copyKey(newlyCreatedKey!.key)" title="Copy">📋</button>
+      </div>
+      <button class="btn-secondary" (click)="dismissNewKey()">I've saved it ✓</button>
+    </div>
+
+    <!-- Loading -->
+    <div class="loading-state" *ngIf="apiKeysLoading">
+      <div class="spinner"></div><span>Loading…</span>
+    </div>
+
+    <!-- Key list -->
+    <div class="apikey-list" *ngIf="!apiKeysLoading">
+      <div class="empty-state" *ngIf="apiKeys.length === 0 && !newlyCreatedKey">
+        <div class="empty-icon">🔑</div>
+        <div class="empty-text">No API keys yet. Create one below.</div>
+      </div>
+
+      <div class="apikey-row" *ngFor="let k of apiKeys">
+        <div class="apikey-info">
+          <span class="apikey-name">{{ k.name }}</span>
+          <span class="apikey-prefix">{{ k.key_prefix }}…</span>
+          <span class="apikey-meta">Created {{ formatDate(k.createdAt) }}</span>
+          <span class="apikey-meta">Last used {{ formatDate(k.lastUsedAt) }}</span>
+        </div>
+        <button class="icon-btn danger" (click)="deleteApiKey(k.id)"
+          [class.confirm]="confirmDeleteKeyId === k.id">
+          {{ confirmDeleteKeyId === k.id ? 'Sure?' : '🗑' }}
+        </button>
+      </div>
+    </div>
+
+    <!-- Create new key -->
+    <div class="add-category" *ngIf="!newlyCreatedKey">
+      <p class="add-title">Create new key</p>
+      <div class="add-form">
+        <input class="cat-input" [(ngModel)]="newKeyName" name="newKeyName"
+          placeholder="e.g. Home Assistant" maxlength="60"
+          (keydown.enter)="createApiKey()" />
+        <button class="btn-primary" (click)="createApiKey()"
+          [disabled]="!newKeyName.trim() || addKeyLoading">
+          {{ addKeyLoading ? '…' : '+ Generate Key' }}
+        </button>
+      </div>
+    </div>
   </div>
 
   <!-- Import/Export tab -->

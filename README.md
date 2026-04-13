@@ -137,10 +137,12 @@ Browser / Mobile
 | 🔁 Recurring Tasks | Auto-reopens with shifted due date on close. Daily/weekly/monthly/custom. |
 | ⚠️ Overdue Banner | Home screen warning with count of overdue tasks |
 | 🔢 Open Count | Open task count badge on View Tasks home button |
-| ⚙️ Settings Panel | Slide-over (gear icon, top-right, admin only): categories, feature flags, and import/export |
+| ⚙️ Settings Panel | Slide-over (gear icon, top-right, admin only): categories, feature flags, API keys, and import/export |
 | ⇅ Import / Export | Export all tasks to CSV with IDs. Import with upsert-by-ID logic. (admin only) |
 | 🔐 Authentication | OIDC login via Authentik. All API calls require a valid Bearer token. |
 | 👥 Role-based access | `taskpilot-admin` group gates Settings. Enforced on both frontend and backend. |
+| 🔑 API Keys | Static API keys for service accounts (e.g. Home Assistant). Generated and revoked in Settings → API Keys. |
+| 🏠 Home Assistant | Custom integration with two sensors: open task count and overdue task count. |
 | 🏆 Points | Earn points on task close: `duration × priority_multiplier`. Streak and overdue bonuses apply. Always calculated; hidden when `FEATURE_POINTS=false`. |
 | 🔥 Streaks | Daily close streak with longest streak tracking. Visible when `FEATURE_STREAKS=true`. |
 | 🎖 Achievements | 12 unlockable badges (first close, streaks, speed run, early bird, etc.). Visible when `FEATURE_ACHIEVEMENTS=true`. |
@@ -254,6 +256,8 @@ cp ./data/tasks.db ./data/tasks.backup.$(date +%Y%m%d).db
 
 All require `Authorization: Bearer <token>` except `/health`. Routes marked 🔒 also require `taskpilot-admin` group membership.
 
+The `/tasks/stats` endpoint additionally accepts an `X-API-Key` header as an alternative to Bearer token auth — this is used by the Home Assistant integration.
+
 | Method | Path | Auth | Description |
 |---|---|---|---|
 | `GET` | `/me` | user | Current user info + isAdmin flag |
@@ -269,6 +273,9 @@ All require `Authorization: Bearer <token>` except `/health`. Routes marked 🔒
 | `POST` | `/tasks/suggest` | user | Best task for available time |
 | `GET` | `/tasks/export` | 🔒 admin | Download CSV |
 | `POST` | `/tasks/import` | 🔒 admin | Upload CSV (upsert by ID) |
+| `GET` | `/apikeys` | 🔒 admin | List API keys (names + prefixes only, never full keys) |
+| `POST` | `/apikeys` | 🔒 admin | Generate a new API key (full key returned once) |
+| `DELETE` | `/apikeys/:id` | 🔒 admin | Revoke an API key |
 | `GET` | `/health` | none | Health check |
 
 ---
@@ -280,6 +287,36 @@ All require `Authorization: Bearer <token>` except `/health`. Routes marked 🔒
 | `internal` | bridge | Frontend ↔ API communication |
 | `frontend` | external | Traefik → frontend routing |
 | `authentik_authentik_backend` | external | API → Authentik JWKS fetch |
+
+---
+
+## Home Assistant Integration
+
+A custom integration is included in the `homeassistant/` folder. It provides two sensors:
+
+| Entity | Description |
+|---|---|
+| `sensor.taskpilot_open_tasks` | Number of currently open tasks |
+| `sensor.taskpilot_overdue_tasks` | Number of overdue open tasks |
+
+### Quick setup
+
+1. **Generate an API key** — TaskPilot → ⚙ Settings → 🔑 API Keys → Generate Key. Copy it immediately (shown once only).
+
+2. **Install the integration** — copy `homeassistant/custom_components/taskpilot/` into your HA `config/custom_components/` directory and restart HA.
+
+3. **Add the integration** — Settings → Devices & Services → Add Integration → search "TaskPilot". Enter:
+   - API URL: `https://your-app-domain.com/api`
+   - API Key: the key from step 1
+
+See `homeassistant/INSTALL.md` for full instructions, example automations, and a dashboard card.
+
+### API key security
+
+- Keys are stored as SHA-256 hashes — the plaintext is never stored and cannot be retrieved
+- Each key has a visible prefix (first 10 chars) for identification
+- Revoke from Settings → API Keys at any time
+- API keys only grant access to `/tasks/stats` — they cannot read individual tasks, create tasks, or access any admin endpoint
 
 ---
 
