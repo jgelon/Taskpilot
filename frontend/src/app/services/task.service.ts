@@ -24,7 +24,7 @@ export interface Task {
   closedBy: string | null;
   closedByName: string | null;
   closedAt: string | null;
-  recurring: 'none' | 'daily' | 'weekly' | 'monthly' | 'custom';
+  recurring: 'none' | 'daily' | 'weekly' | 'monthly' | 'custom' | 'soon';
   recurrenceDays: number | null;
   categoryId: string | null;
   categoryName: string | null;

@@ -65,7 +65,7 @@
       <span class="priority-badge p{{priority}}">P{{priority}}</span>
       <span class="preview-text">{{ priority === 1 ? 'Critical' : priority === 2 ? 'High' : priority === 3 ? 'Medium' : 'Low' }}</span>
       <span class="recur-preview" *ngIf="recurring !== 'none'">
-        · Repeats {{ recurring === 'custom' ? 'every ' + (recurrenceDays || '?') + ' days' : recurring }}
+        · Repeats {{ recurring === 'soon' ? 'immediately when done' : recurring === 'custom' ? 'every ' + (recurrenceDays || '?') + ' days' : recurring }}
       </span>
     </div>
     <button class="btn-primary" type="submit" [disabled]="!isValid || loading">

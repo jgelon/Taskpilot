@@ -151,6 +151,21 @@ function rowToTask(row) {
 
 function scheduleNextRecurrence(task) {
   if (!task.recurring || task.recurring === 'none') return;
+
+  // 'soon' — recreate immediately with no due date
+  if (task.recurring === 'soon') {
+    db.run(
+      `INSERT INTO tasks (id,name,description,estimatedDuration,priority,dueDate,dateAdded,status,
+        createdBy,createdByName,recurring,recurrenceDays,categoryId,assignedTo,assignedToName)
+       VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
+      [uuidv4(), task.name, task.description, task.estimatedDuration, task.priority,
+       null, new Date().toISOString(), 'open',
+       task.createdBy, task.createdByName, task.recurring, null,
+       task.categoryId || null, task.assignedTo || null, task.assignedToName || null]
+    );
+    console.log(`[RECUR] Recreated "${task.name}" immediately (soon)`);
+    return;
+  }
   const days = task.recurrenceDays || { daily: 1, weekly: 7, monthly: 30 }[task.recurring] || 7;
   const base = task.dueDate ? new Date(task.dueDate) : new Date();
   base.setDate(base.getDate() + days);

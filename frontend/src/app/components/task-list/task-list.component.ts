@@ -57,7 +57,7 @@ export class TaskListComponent implements OnInit {
 
   recurLabel(t: Task): string | null {
     if (!t.recurring || t.recurring === 'none') return null;
-    return t.recurring === 'custom' ? `Every ${t.recurrenceDays}d` : t.recurring.charAt(0).toUpperCase() + t.recurring.slice(1);
+    if (t.recurring === 'custom') return `Every ${t.recurrenceDays}d`; if (t.recurring === 'soon') return 'Soon'; return t.recurring.charAt(0).toUpperCase() + t.recurring.slice(1);
   }
 
   formatDate(d: string | null) {
