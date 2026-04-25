@@ -96,11 +96,21 @@ export class EditTaskComponent implements OnInit {
   }
 
   closeTask() {
-    if (!this.isValid || this.loading) return;
+    if (this.loading) return;
     this.closing = true;
     this.loading = true;
-    this.status = 'closed';
-    this.save();
+    // Call API directly — don't route through save() to avoid flag conflicts
+    this.taskService.updateTask(this.task.id, { status: 'closed' }).subscribe({
+      next: (result: any) => {
+        this.showToast('Task done! 🎉', 'success');
+        setTimeout(() => this.done.emit(result._gamification || null), 800);
+      },
+      error: () => {
+        this.loading = false;
+        this.closing = false;
+        this.showToast('Failed to close task', 'error');
+      }
+    });
   }
 
   deleteTask() {

@@ -101,8 +101,7 @@
     <button class="btn-success" type="button" (click)="closeTask()" *ngIf="task.status === 'open'" [disabled]="loading">
       <span class="btn-spinner" *ngIf="closing"></span>
       <span>{{ closing ? 'Closing…' : '✓ Mark Done' }}</span>
-    </button>
-    <button class="btn-secondary" type="button" (click)="cancel.emit()" [disabled]="loading">Cancel</button>
+    </button>    <button class="btn-secondary" type="button" (click)="cancel.emit()" [disabled]="loading">Cancel</button>
     <button class="btn-danger" type="button" (click)="deleteTask()" [disabled]="loading">
       <span class="btn-spinner btn-spinner-danger" *ngIf="deleting"></span>
       <span>{{ deleting ? 'Deleting…' : confirmDelete ? 'Confirm Delete' : '🗑 Delete' }}</span>
