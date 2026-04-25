@@ -64,7 +64,8 @@
 
     <div class="action-row">
       <button class="btn-primary accept-btn" (click)="acceptTask()" [disabled]="loading">
-        {{ loading ? '…' : '✓ Accept' }}
+        <span class="btn-spinner" *ngIf="loading"></span>
+        <span>{{ loading ? 'Accepting…' : '✓ Accept' }}</span>
       </button>
       <button class="btn-secondary decline-btn" (click)="declineTask()" [disabled]="loading">
         Skip →
@@ -105,6 +106,7 @@
 
     <div class="finish-options">
       <button class="finish-card finish-done" (click)="finishTask(true)" [disabled]="loading">
+        <span class="btn-spinner" *ngIf="loading"></span>
         <span class="finish-icon">🎉</span>
         <span class="finish-title">Yes, done!</span>
         <span class="finish-desc">Close this task</span>

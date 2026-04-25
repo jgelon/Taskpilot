@@ -1,30 +1,35 @@
 <div class="create-task">
   <h2 class="section-title">New Task</h2>
   <p class="subtitle">Add something to your pile</p>
-  <form class="task-form" (ngSubmit)="submit()">
+
+  <div class="task-form">
     <div class="form-group">
       <label>Task Name *</label>
       <input type="text" [(ngModel)]="name" name="name" placeholder="What needs to be done?" maxlength="120" />
     </div>
+
     <div class="form-group">
       <label>Description</label>
       <textarea [(ngModel)]="description" name="description" placeholder="Optional details..."></textarea>
     </div>
+
     <div class="form-row">
       <div class="form-group">
         <label>Duration (minutes) *</label>
-        <input type="number" [(ngModel)]="estimatedDuration" name="estimatedDuration" placeholder="e.g. 30" min="1" />
+        <input type="text" inputmode="numeric" pattern="[0-9]*"
+          [(ngModel)]="estimatedDurationStr" name="estimatedDuration" placeholder="e.g. 30" />
       </div>
       <div class="form-group">
         <label>Priority *</label>
         <select [(ngModel)]="priority" name="priority">
-          <option [value]="1">1 — Critical</option>
-          <option [value]="2">2 — High</option>
-          <option [value]="3">3 — Medium</option>
-          <option [value]="4">4 — Low</option>
+          <option value="1">1 — Critical</option>
+          <option value="2">2 — High</option>
+          <option value="3">3 — Medium</option>
+          <option value="4">4 — Low</option>
         </select>
       </div>
     </div>
+
     <div class="form-row">
       <div class="form-group">
         <label>Due Date</label>
@@ -33,15 +38,16 @@
       <div class="form-group">
         <label>Category</label>
         <select [(ngModel)]="categoryId" name="categoryId">
-          <option [ngValue]="null">No category</option>
-          <option *ngFor="let c of categories" [ngValue]="c.id">{{ c.name }}</option>
+          <option value="">No category</option>
+          <option *ngFor="let c of categories" [value]="c.id">{{ c.name }}</option>
         </select>
       </div>
     </div>
+
     <div class="form-group" *ngIf="auth.features.assignment">
       <label>Assign to</label>
-      <select [ngModel]="assignedTo" (ngModelChange)="onAssigneeChange($event)" name="assignedTo">
-        <option [ngValue]="null">Unassigned</option>
+      <select [(ngModel)]="assignedToUsername" (ngModelChange)="onAssigneeChange($event)" name="assignedTo">
+        <option value="">Unassigned</option>
         <option *ngFor="let u of users" [value]="u.username">{{ u.name }}</option>
       </select>
     </div>
@@ -57,21 +63,27 @@
         <option value="custom">Custom interval</option>
       </select>
     </div>
+
     <div class="form-group" *ngIf="recurring === 'custom'">
       <label>Repeat every (days)</label>
-      <input type="number" [(ngModel)]="recurrenceDays" name="recurrenceDays" placeholder="e.g. 14" min="1" />
+      <input type="text" inputmode="numeric" pattern="[0-9]*"
+        [(ngModel)]="recurrenceDaysStr" name="recurrenceDays" placeholder="e.g. 14" />
     </div>
+
     <div class="priority-preview">
       <span class="preview-label">Priority</span>
       <span class="priority-badge p{{priority}}">P{{priority}}</span>
-      <span class="preview-text">{{ priority === 1 ? 'Critical' : priority === 2 ? 'High' : priority === 3 ? 'Medium' : 'Low' }}</span>
+      <span class="preview-text">{{ priority == '1' ? 'Critical' : priority == '2' ? 'High' : priority == '3' ? 'Medium' : 'Low' }}</span>
       <span class="recur-preview" *ngIf="recurring !== 'none'">
-        · Repeats {{ recurring === 'soon' ? 'immediately when done' : recurring === 'custom' ? 'every ' + (recurrenceDays || '?') + ' days' : recurring }}
+        · Repeats {{ recurring === 'soon' ? 'immediately when done' : recurring === 'custom' ? 'every ' + (recurrenceDaysStr || '?') + ' days' : recurring }}
       </span>
     </div>
-    <button class="btn-primary" type="submit" [disabled]="!isValid || loading">
-      {{ loading ? 'Creating...' : 'Create Task' }}
+
+    <button class="btn-primary" type="button" (click)="submit()" [disabled]="!isValid || loading">
+      <span class="btn-spinner" *ngIf="loading"></span>
+      <span>{{ loading ? 'Creating...' : 'Create Task' }}</span>
     </button>
-  </form>
+  </div>
 </div>
+
 <div class="toast" [class]="toast?.type" *ngIf="toast">{{ toast?.msg }}</div>

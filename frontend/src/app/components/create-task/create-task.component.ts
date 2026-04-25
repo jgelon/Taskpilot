@@ -14,13 +14,20 @@ import { AuthService } from '../../services/auth.service';
 export class CreateTaskComponent implements OnInit {
   @Output() done = new EventEmitter<void>();
 
-  name = ''; description = ''; estimatedDuration: number | null = null;
-  priority: number = 2; dueDate = ''; recurring = 'none';
-  recurrenceDays: number | null = null; categoryId: string | null = null;
-  categories: Category[] = [];
-  users: {username: string; name: string}[] = [];
+  name = '';
+  description = '';
+  // Use strings for numeric inputs — avoids Samsung Internet type="number" bugs
+  estimatedDurationStr = '';
+  recurrenceDaysStr = '';
+  priority = '2';  // string for select binding
+  dueDate = '';
+  recurring = 'none';
+  categoryId = '';  // empty string instead of null for Samsung select compat
+  assignedToUsername = '';
   assignedTo: string | null = null;
   assignedToName: string | null = null;
+  categories: Category[] = [];
+  users: {username: string; name: string}[] = [];
   loading = false;
   toast: { msg: string; type: string } | null = null;
 
@@ -33,27 +40,9 @@ export class CreateTaskComponent implements OnInit {
     }
   }
 
-  get isValid() { return this.name.trim() && this.estimatedDuration && this.estimatedDuration > 0; }
-
-  submit() {
-    if (!this.isValid || this.loading) return;
-    this.loading = true;
-    this.taskService.createTask({
-      name: this.name.trim(), description: this.description.trim() || undefined,
-      estimatedDuration: this.estimatedDuration!, priority: this.priority,
-      dueDate: this.dueDate || null, recurring: this.recurring,
-      recurrenceDays: this.recurring === 'custom' ? this.recurrenceDays : null,
-      categoryId: this.categoryId || null,
-      assignedTo: this.assignedTo || null,
-      assignedToName: this.assignedToName || null
-    }).subscribe({
-      next: () => { this.showToast('Task created!', 'success'); setTimeout(() => this.done.emit(), 900); },
-      error: (err) => {
-        this.loading = false;
-        const d = err?.error?.detail || err?.error?.error || err?.message || err?.status;
-        this.showToast(`Error: ${d || 'Failed to create task'}`, 'error');
-      }
-    });
+  get isValid() {
+    const dur = parseInt(this.estimatedDurationStr, 10);
+    return this.name.trim().length > 0 && !isNaN(dur) && dur > 0;
   }
 
   onAssigneeChange(username: string) {
@@ -61,6 +50,36 @@ export class CreateTaskComponent implements OnInit {
     const user = this.users.find(u => u.username === username);
     this.assignedTo = username;
     this.assignedToName = user?.name || username;
+  }
+
+  submit() {
+    if (!this.isValid || this.loading) return;
+    const dur = parseInt(this.estimatedDurationStr, 10);
+    const days = this.recurrenceDaysStr ? parseInt(this.recurrenceDaysStr, 10) : null;
+    this.loading = true;
+    this.taskService.createTask({
+      name: this.name.trim(),
+      description: this.description.trim() || undefined,
+      estimatedDuration: dur,
+      priority: parseInt(this.priority, 10),
+      dueDate: this.dueDate || null,
+      recurring: this.recurring,
+      recurrenceDays: this.recurring === 'custom' ? days : null,
+      categoryId: this.categoryId || null,
+      assignedTo: this.assignedTo,
+      assignedToName: this.assignedToName
+    }).subscribe({
+      next: () => {
+        this.showToast('Task created!', 'success');
+        setTimeout(() => this.done.emit(), 900);
+      },
+      error: (err) => {
+        this.loading = false;
+        const d = err?.error?.detail || err?.error?.error || err?.message || err?.status;
+        this.showToast(`Error: ${d || 'Failed to create task'}`, 'error');
+        console.error('Create task error:', err);
+      }
+    });
   }
 
   showToast(msg: string, type: string) {

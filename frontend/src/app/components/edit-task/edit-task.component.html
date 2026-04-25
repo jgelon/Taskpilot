@@ -15,7 +15,7 @@
     </span>
   </div>
 
-  <form class="task-form" (ngSubmit)="save()">
+  <div class="task-form">
     <div class="form-group">
       <label>Task Name *</label>
       <input type="text" [(ngModel)]="name" name="name" maxlength="120" />
@@ -29,15 +29,16 @@
     <div class="form-row">
       <div class="form-group">
         <label>Duration (min) *</label>
-        <input type="number" [(ngModel)]="estimatedDuration" name="estimatedDuration" min="1" />
+        <input type="text" inputmode="numeric" pattern="[0-9]*"
+          [(ngModel)]="estimatedDurationStr" name="estimatedDuration" />
       </div>
       <div class="form-group">
         <label>Priority *</label>
         <select [(ngModel)]="priority" name="priority">
-          <option [value]="1">1 — Critical</option>
-          <option [value]="2">2 — High</option>
-          <option [value]="3">3 — Medium</option>
-          <option [value]="4">4 — Low</option>
+          <option value="1">1 — Critical</option>
+          <option value="2">2 — High</option>
+          <option value="3">3 — Medium</option>
+          <option value="4">4 — Low</option>
         </select>
       </div>
     </div>
@@ -59,15 +60,15 @@
     <div class="form-group">
       <label>Category</label>
       <select [(ngModel)]="categoryId" name="categoryId">
-        <option [ngValue]="null">No category</option>
-        <option *ngFor="let c of categories" [ngValue]="c.id">{{ c.name }}</option>
+        <option value="">No category</option>
+        <option *ngFor="let c of categories" [value]="c.id">{{ c.name }}</option>
       </select>
     </div>
 
     <div class="form-group" *ngIf="auth.features.assignment">
       <label>Assign to</label>
-      <select [ngModel]="assignedTo" (ngModelChange)="onAssigneeChange($event)" name="assignedTo">
-        <option [ngValue]="null">Unassigned</option>
+      <select [(ngModel)]="assignedToUsername" (ngModelChange)="onAssigneeChange($event)" name="assignedTo">
+        <option value="">Unassigned</option>
         <option *ngFor="let u of users" [value]="u.username">{{ u.name }}</option>
       </select>
     </div>
@@ -86,21 +87,25 @@
 
     <div class="form-group" *ngIf="recurring === 'custom'">
       <label>Repeat every (days)</label>
-      <input type="number" [(ngModel)]="recurrenceDays" name="recurrenceDays" min="1" />
+      <input type="text" inputmode="numeric" pattern="[0-9]*"
+        [(ngModel)]="recurrenceDaysStr" name="recurrenceDays" />
     </div>
 
-    <button class="btn-primary" type="submit" [disabled]="!isValid || loading">
-      {{ loading ? 'Saving…' : 'Save Changes' }}
+    <button class="btn-primary" type="button" (click)="save()" [disabled]="!isValid || loading">
+      <span class="btn-spinner" *ngIf="loading && !closing && !deleting"></span>
+      <span>{{ loading && !closing && !deleting ? 'Saving…' : 'Save Changes' }}</span>
     </button>
-  </form>
+  </div>
 
   <div class="edit-actions">
-    <button class="btn-success" (click)="closeTask()" *ngIf="task.status === 'open'" [disabled]="loading">
-      ✓ Mark Done
+    <button class="btn-success" type="button" (click)="closeTask()" *ngIf="task.status === 'open'" [disabled]="loading">
+      <span class="btn-spinner" *ngIf="closing"></span>
+      <span>{{ closing ? 'Closing…' : '✓ Mark Done' }}</span>
     </button>
-    <button class="btn-secondary" (click)="cancel.emit()" [disabled]="loading">Cancel</button>
-    <button class="btn-danger" (click)="deleteTask()" [disabled]="loading">
-      {{ confirmDelete ? 'Confirm Delete' : '🗑 Delete' }}
+    <button class="btn-secondary" type="button" (click)="cancel.emit()" [disabled]="loading">Cancel</button>
+    <button class="btn-danger" type="button" (click)="deleteTask()" [disabled]="loading">
+      <span class="btn-spinner btn-spinner-danger" *ngIf="deleting"></span>
+      <span>{{ deleting ? 'Deleting…' : confirmDelete ? 'Confirm Delete' : '🗑 Delete' }}</span>
     </button>
   </div>
 </div>

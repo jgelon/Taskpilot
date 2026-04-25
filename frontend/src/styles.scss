@@ -121,3 +121,23 @@ input, textarea, select { font-family: inherit; }
   animation: toast-in 0.3s ease;
 }
 @keyframes toast-in { from { opacity:0; transform: translateX(-50%) translateY(10px); } to { opacity:1; transform: translateX(-50%) translateY(0); } }
+
+/* ── Button spinner ─────────────────────────────────────────────────────────── */
+.btn-primary, .btn-success, .btn-danger, .btn-secondary {
+  display: flex; align-items: center; justify-content: center; gap: 8px;
+}
+
+.btn-spinner {
+  width: 14px; height: 14px; flex-shrink: 0;
+  border: 2px solid rgba(0,0,0,0.2);
+  border-top-color: #0d0d0f;
+  border-radius: 50%;
+  animation: btn-spin 0.6s linear infinite;
+}
+
+.btn-spinner-danger {
+  border-color: rgba(255,92,92,0.2);
+  border-top-color: var(--danger);
+}
+
+@keyframes btn-spin { to { transform: rotate(360deg); } }
