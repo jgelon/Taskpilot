@@ -524,25 +524,43 @@ app.post('/todoist/send', requireAuth, async (req, res) => {
     ...(task.dueDate ? { due_date: task.dueDate } : {})
   };
 
+  // Todoist has both /api/v1/ (newer) and /rest/v2/ (older) endpoints
+  // Try the newer one first, fall back to v2 if it returns 410/404
+  const TODOIST_ENDPOINTS = [
+    'https://api.todoist.com/api/v1/tasks',
+    'https://api.todoist.com/rest/v2/tasks',
+  ];
+
   try {
     const token = prefs.todoist_token.trim();
-    console.log(`[Todoist] Sending "${task.name}" for ${req.user.username} to https://api.todoist.com/rest/v2/tasks`);
-    const response = await fetch('https://api.todoist.com/rest/v2/tasks', {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${token}`,
-        'Content-Type': 'application/json'
-      },
-      body: JSON.stringify(todoistPayload)
-    });
+    let response;
+    let usedEndpoint;
 
-    console.log(`[Todoist] Response status: ${response.status}`);
+    for (const endpoint of TODOIST_ENDPOINTS) {
+      console.log(`[Todoist] Trying endpoint: ${endpoint}`);
+      response = await fetch(endpoint, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json',
+          'X-Request-Id': uuidv4(), // required by some Todoist plans for idempotency
+        },
+        body: JSON.stringify(todoistPayload)
+      });
+      console.log(`[Todoist] Response: ${response.status} from ${endpoint}`);
+
+      if (response.status !== 404 && response.status !== 410) {
+        usedEndpoint = endpoint;
+        break; // got a real response (success or auth error), stop trying
+      }
+      console.warn(`[Todoist] Endpoint ${endpoint} returned ${response.status}, trying next`);
+    }
+
     if (response.status === 401) return res.status(401).json({ error: 'Invalid Todoist token. Check your profile settings.' });
     if (response.status === 403) return res.status(403).json({ error: 'Todoist token does not have permission to create tasks.' });
-    if (response.status === 410) return res.status(502).json({ error: 'Todoist API endpoint has moved. Please report this issue.' });
     if (!response.ok) {
       const errText = await response.text().catch(() => '');
-      console.error(`[Todoist] Error body: ${errText}`);
+      console.error(`[Todoist] Error from ${usedEndpoint}: ${response.status} — ${errText}`);
       return res.status(502).json({ error: `Todoist API error: ${response.status}`, detail: errText });
     }
 
