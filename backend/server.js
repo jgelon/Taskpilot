@@ -494,11 +494,12 @@ app.get('/profile/preferences', requireAuth, (req, res) => {
 app.put('/profile/preferences', requireAuth, (req, res) => {
   const { todoistToken } = req.body;
   if (todoistToken === undefined) return res.status(400).json({ error: 'todoistToken required' });
+  const trimmed = todoistToken ? todoistToken.trim() : null;
   db.run(
     `INSERT OR REPLACE INTO user_preferences (username, todoist_token) VALUES (?,?)`,
-    [req.user.username, todoistToken || null]
+    [req.user.username, trimmed || null]
   );
-  res.json({ todoistConnected: !!todoistToken });
+  res.json({ todoistConnected: !!trimmed });
 });
 
 // ── Todoist proxy (keeps token server-side) ───────────────────────────────────
@@ -516,7 +517,7 @@ app.post('/todoist/send', requireAuth, async (req, res) => {
 
   // Build Todoist task content
   const priority = { 1: 4, 2: 3, 3: 2, 4: 1 }[task.priority] || 1; // Todoist: 4=urgent,1=normal
-  const body = {
+  const todoistPayload = {
     content: task.name,
     description: task.description || '',
     priority,
@@ -524,17 +525,26 @@ app.post('/todoist/send', requireAuth, async (req, res) => {
   };
 
   try {
+    const token = prefs.todoist_token.trim();
+    console.log(`[Todoist] Sending "${task.name}" for ${req.user.username} to https://api.todoist.com/rest/v2/tasks`);
     const response = await fetch('https://api.todoist.com/rest/v2/tasks', {
       method: 'POST',
       headers: {
-        'Authorization': `Bearer ${prefs.todoist_token}`,
+        'Authorization': `Bearer ${token}`,
         'Content-Type': 'application/json'
       },
-      body: JSON.stringify(body)
+      body: JSON.stringify(todoistPayload)
     });
 
+    console.log(`[Todoist] Response status: ${response.status}`);
     if (response.status === 401) return res.status(401).json({ error: 'Invalid Todoist token. Check your profile settings.' });
-    if (!response.ok) return res.status(502).json({ error: `Todoist API error: ${response.status}` });
+    if (response.status === 403) return res.status(403).json({ error: 'Todoist token does not have permission to create tasks.' });
+    if (response.status === 410) return res.status(502).json({ error: 'Todoist API endpoint has moved. Please report this issue.' });
+    if (!response.ok) {
+      const errText = await response.text().catch(() => '');
+      console.error(`[Todoist] Error body: ${errText}`);
+      return res.status(502).json({ error: `Todoist API error: ${response.status}`, detail: errText });
+    }
 
     const result = await response.json();
     console.log(`[Todoist] Sent task "${task.name}" for ${req.user.username}, Todoist id: ${result.id}`);
