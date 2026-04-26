@@ -5,6 +5,7 @@ import { TaskListComponent } from './components/task-list/task-list.component';
 import { GetTaskComponent } from './components/get-task/get-task.component';
 import { SettingsComponent } from './components/settings/settings.component';
 import { GamificationComponent } from './components/gamification/gamification.component';
+import { ProfileComponent } from './components/profile/profile.component';
 import { AuthService } from './services/auth.service';
 import { TaskService, TaskStats } from './services/task.service';
 import { PushService } from './services/push.service';
@@ -17,13 +18,14 @@ type View = 'home' | 'create' | 'list' | 'get' | 'gamification';
 @Component({
   selector: 'app-root',
   standalone: true,
-  imports: [CommonModule, CreateTaskComponent, TaskListComponent, GetTaskComponent, SettingsComponent, GamificationComponent],
+  imports: [CommonModule, CreateTaskComponent, TaskListComponent, GetTaskComponent, SettingsComponent, GamificationComponent, ProfileComponent],
   templateUrl: './app.component.html',
   styleUrl: './app.component.scss'
 })
 export class AppComponent implements OnInit, OnDestroy {
   currentView: View = 'home';
   settingsOpen = false;
+  profileOpen = false;
   stats: TaskStats | null = null;
   statsLoading = true;
   window = window;
@@ -115,9 +117,13 @@ export class AppComponent implements OnInit, OnDestroy {
   }
 
   openSettings() {
-    // Push a history entry so back closes settings
     history.pushState({ view: this.currentView, settings: true }, '');
     this.settingsOpen = true;
+  }
+
+  openProfile() {
+    history.pushState({ view: this.currentView, settings: false }, '');
+    this.profileOpen = true;
   }
 
   onTaskChanged() { this.loadStats(); }

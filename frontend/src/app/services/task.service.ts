@@ -135,6 +135,19 @@ export class TaskService {
     return this.http.post(`${this.api}/push/unsubscribe`, { endpoint }, { headers: this.h() });
   }
 
+  // User preferences
+  getPreferences(): Observable<{todoistConnected: boolean}> {
+    return this.http.get<any>(`${this.api}/profile/preferences`, { headers: this.h() });
+  }
+  savePreferences(todoistToken: string): Observable<{todoistConnected: boolean}> {
+    return this.http.put<any>(`${this.api}/profile/preferences`, { todoistToken }, { headers: this.h() });
+  }
+
+  // Todoist
+  sendToTodoist(taskId: string): Observable<{success: boolean; todoistUrl?: string}> {
+    return this.http.post<any>(`${this.api}/todoist/send`, { taskId }, { headers: this.h() });
+  }
+
   getFeatures(): Observable<any> {
     return this.http.get<any>(`${this.api}/settings/features`, { headers: this.h() });
   }

@@ -45,7 +45,7 @@ export class SettingsComponent implements OnInit {
   confirmDeleteKeyId: string | null = null;
 
   // Feature flags
-  features: Features = { points: true, streaks: true, achievements: true, leaderboard: true, assignment: true, pushNotifications: true };
+  features: Features = { points: true, streaks: true, achievements: true, leaderboard: true, assignment: true, pushNotifications: true, todoist: true };
   featuresLoading = false;
   featuresChanged = false;
 

@@ -44,6 +44,7 @@
         <span class="user-name">{{ auth.userProfile.name }}</span>
       </div>
       <button class="icon-header-btn trophy-btn" *ngIf="anyGamificationEnabled" (click)="setView('gamification')" title="Stats &amp; Achievements">🏆</button>
+      <button class="icon-header-btn" (click)="openProfile()" title="My Profile">👤</button>
       <button class="icon-header-btn" *ngIf="auth.isAdmin" (click)="openSettings()" title="Settings">⚙</button>
       <button class="icon-header-btn logout" (click)="auth.logout()" title="Sign out">⏻</button>
     </div>
@@ -117,6 +118,7 @@
     </div>
   </main>
 
+  <app-profile *ngIf="profileOpen" (close)="profileOpen = false"></app-profile>
   <app-settings *ngIf="settingsOpen" [isAdmin]="auth.isAdmin" (close)="settingsOpen = false"></app-settings>
 
   <!-- Gamification result toast -->

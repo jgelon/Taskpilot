@@ -148,6 +148,7 @@ Browser / Mobile
 | 👤 Task Assignment | Assign tasks to specific users. Assigned tasks are excluded from others' Get a Task suggestions. Toggle in Settings → Features. |
 | 🔔 Push Notifications | Browser push notifications when tasks become overdue (hourly check). Requires VAPID keys. Toggle in Settings → Features. |
 | 🏠 Home Assistant | Custom integration with two sensors: open task count and overdue task count. |
+| ✅ Todoist | Send any open task to your Todoist inbox with one tap. Each user connects their own account via My Profile (👤). Global toggle in Settings → Features. |
 | 🏆 Points | Earn points on task close: `duration × priority_multiplier`. Streak and overdue bonuses apply. Always calculated; hidden when `FEATURE_POINTS=false`. |
 | 🔥 Streaks | Daily close streak with longest streak tracking. Visible when `FEATURE_STREAKS=true`. |
 | 🎖 Achievements | 12 unlockable badges (first close, streaks, speed run, early bird, etc.). Visible when `FEATURE_ACHIEVEMENTS=true`. |
@@ -197,6 +198,7 @@ The `.env` variables below set the **initial** defaults when the database is fir
 | `FEATURE_STREAKS` | `true` | Streak display hidden |
 | `FEATURE_ACHIEVEMENTS` | `true` | Achievements tab hidden |
 | `FEATURE_LEADERBOARD` | `true` | Leaderboard tab and API endpoint disabled |
+| `FEATURE_TODOIST` | `true` | Todoist button hidden, send endpoint returns 403 |
 | `FEATURE_ASSIGNMENT` | `true` | Assignee dropdown hidden; assigned tasks excluded from suggestions |
 | `FEATURE_PUSH_NOTIFICATIONS` | `true` | Push subscription + overdue sender disabled |
 
@@ -298,6 +300,32 @@ The `/tasks/stats` endpoint additionally accepts an `X-API-Key` header as an alt
 | `internal` | bridge | Frontend ↔ API communication |
 | `frontend` | external | Traefik → frontend routing |
 | `authentik_authentik_backend` | external | API → Authentik JWKS fetch |
+
+---
+
+## Todoist Integration
+
+Each user can connect their own Todoist account independently — no shared token, no admin involvement.
+
+### Setup (per user)
+1. Open **My Profile** (👤 icon, top-right header)
+2. Go to Todoist → Settings → **Integrations → Developer** and copy your API token
+3. Paste it in the profile screen and tap **Connect Todoist**
+
+Once connected, open task cards in the task list show a **Todoist** button. Tapping it sends the task to your Todoist inbox with:
+- Task name as content
+- Description as note
+- Priority mapped (P1→Urgent, P2→High, P3→Medium, P4→Normal)
+- Due date if set
+
+The token is stored server-side and never exposed to the browser. The admin can disable the feature entirely for all users via Settings → Features → Todoist Integration.
+
+### API endpoints
+| Method | Path | Description |
+|---|---|---|
+| `GET` | `/profile/preferences` | Get current user's preferences (returns `todoistConnected: bool`) |
+| `PUT` | `/profile/preferences` | Save/clear Todoist token |
+| `POST` | `/todoist/send` | Send a task to Todoist (proxied server-side) |
 
 ---
 

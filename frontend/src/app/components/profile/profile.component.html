@@ -1,0 +1,86 @@
+<div class="settings-overlay" (click)="close.emit()"></div>
+<div class="settings-panel">
+  <div class="settings-header">
+    <h2 class="settings-title">My Profile</h2>
+    <button class="close-btn" (click)="close.emit()">✕</button>
+  </div>
+
+  <div class="profile-content">
+    <!-- User info -->
+    <div class="user-card">
+      <div class="user-avatar-large">{{ auth.userProfile.name.charAt(0).toUpperCase() }}</div>
+      <div class="user-details">
+        <div class="user-name-large">{{ auth.userProfile.name }}</div>
+        <div class="user-email">{{ auth.userProfile.email }}</div>
+        <span class="admin-badge" *ngIf="auth.isAdmin">Admin</span>
+      </div>
+    </div>
+
+    <!-- Todoist integration -->
+    <div class="section-block" *ngIf="auth.features.todoist">
+      <div class="section-label">Todoist Integration</div>
+
+      <div class="loading-state" *ngIf="loading">
+        <div class="spinner"></div><span>Loading…</span>
+      </div>
+
+      <ng-container *ngIf="!loading">
+        <!-- Connected state -->
+        <div class="connected-state" *ngIf="todoistConnected && !showToken">
+          <div class="connected-row">
+            <span class="connected-dot"></span>
+            <span class="connected-label">Connected to Todoist</span>
+          </div>
+          <p class="connected-desc">Tasks can be sent to your Todoist inbox with one tap.</p>
+          <div class="connected-actions">
+            <button class="btn-secondary" (click)="showToken = true">Update token</button>
+            <button class="btn-danger" (click)="disconnect()" [disabled]="saving">
+              <span class="btn-spinner btn-spinner-danger" *ngIf="saving"></span>
+              <span>{{ saving ? 'Removing…' : 'Disconnect' }}</span>
+            </button>
+          </div>
+        </div>
+
+        <!-- Not connected / update token -->
+        <div class="token-form" *ngIf="!todoistConnected || showToken">
+          <p class="token-desc" *ngIf="!todoistConnected">
+            Connect your Todoist account to send tasks directly to your inbox.
+          </p>
+          <div class="token-steps">
+            <p>Get your token:</p>
+            <ol>
+              <li>Open <strong>Todoist</strong> → Settings → Integrations</li>
+              <li>Scroll to <strong>Developer</strong> → copy your API token</li>
+            </ol>
+          </div>
+          <div class="form-group">
+            <label>Todoist API Token</label>
+            <input
+              [type]="showToken ? 'text' : 'password'"
+              [(ngModel)]="todoistToken"
+              name="todoistToken"
+              placeholder="Paste your API token here"
+              autocomplete="off"
+            />
+          </div>
+          <div class="token-actions">
+            <button class="btn-primary" type="button" (click)="save()"
+              [disabled]="!todoistToken.trim() || saving">
+              <span class="btn-spinner" *ngIf="saving"></span>
+              <span>{{ saving ? 'Saving…' : todoistConnected ? 'Update' : 'Connect Todoist' }}</span>
+            </button>
+            <button class="btn-secondary" *ngIf="showToken && todoistConnected"
+              (click)="showToken = false; todoistToken = ''">Cancel</button>
+          </div>
+        </div>
+      </ng-container>
+    </div>
+
+    <div class="section-block" *ngIf="!auth.features.todoist">
+      <div class="section-label">Todoist Integration</div>
+      <p class="disabled-note">Todoist integration is currently disabled by an admin.</p>
+    </div>
+  </div>
+</div>
+
+<div class="toast" [class]="toast?.type" *ngIf="toast">{{ toast?.msg }}</div>

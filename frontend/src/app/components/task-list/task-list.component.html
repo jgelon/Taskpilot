@@ -86,6 +86,20 @@
           {{ task.categoryName }}
         </span>
       </div>
+      <!-- Todoist send button -->
+      <div class="card-todoist" *ngIf="auth.features.todoist && todoistConnected && task.status === 'open'" (click)="$event.stopPropagation()">
+        <button class="todoist-btn" (click)="sendToTodoist($event, task)"
+          [disabled]="sendingToTodoist === task.id"
+          title="Send to Todoist">
+          <span class="btn-spinner todoist-spinner" *ngIf="sendingToTodoist === task.id"></span>
+          <span *ngIf="sendingToTodoist !== task.id">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor">
+              <path d="M21.919 0H2.081A2.081 2.081 0 000 2.081v19.838A2.081 2.081 0 002.081 24h19.838A2.081 2.081 0 0024 21.919V2.081A2.081 2.081 0 0021.919 0zM10.32 16.75L5.54 11.97l1.41-1.41 3.37 3.37 7.03-7.03 1.41 1.41z"/>
+            </svg>
+          </span>
+          {{ sendingToTodoist === task.id ? '' : 'Todoist' }}
+        </button>
+      </div>
       <p class="task-desc" *ngIf="task.description">{{ task.description }}</p>
     </div>
   </div>

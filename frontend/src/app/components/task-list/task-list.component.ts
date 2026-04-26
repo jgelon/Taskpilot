@@ -2,6 +2,7 @@ import { Component, OnInit, Output, EventEmitter } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { TaskService, Task, Category, SortField, SortOrder } from '../../services/task.service';
+import { AuthService } from '../../services/auth.service';
 import { EditTaskComponent } from '../edit-task/edit-task.component';
 
 @Component({
@@ -27,10 +28,11 @@ export class TaskListComponent implements OnInit {
     { value: 'estimatedDuration', label: 'Duration' },
   ];
 
-  constructor(private taskService: TaskService) {}
+  constructor(private taskService: TaskService, public auth: AuthService) {}
 
   ngOnInit() {
     this.taskService.getCategories().subscribe({ next: c => this.categories = c, error: () => {} });
+    this.checkTodoistConnection();
     this.loadTasks();
   }
 
@@ -66,6 +68,35 @@ export class TaskListComponent implements OnInit {
   }
 
   isOverdue(t: Task) { return t.dueDate && t.status === 'open' && new Date(t.dueDate) < new Date(); }
+
+  // Todoist
+  todoistConnected = false;
+  sendingToTodoist: string | null = null; // task id being sent
+
+  checkTodoistConnection() {
+    if (!this.auth.features.todoist) return;
+    this.taskService.getPreferences().subscribe({
+      next: p => this.todoistConnected = p.todoistConnected,
+      error: () => {}
+    });
+  }
+
+  sendToTodoist(event: Event, task: Task) {
+    event.stopPropagation(); // don't open edit view
+    if (this.sendingToTodoist) return;
+    this.sendingToTodoist = task.id;
+    this.taskService.sendToTodoist(task.id).subscribe({
+      next: (res) => {
+        this.sendingToTodoist = null;
+        this.showToast('Sent to Todoist! ✓', 'success');
+      },
+      error: (err) => {
+        this.sendingToTodoist = null;
+        const msg = err?.error?.error || 'Failed to send to Todoist';
+        this.showToast(msg, 'error');
+      }
+    });
+  }
 
   showToast(msg: string, type: string) {
     this.toast = { msg, type };

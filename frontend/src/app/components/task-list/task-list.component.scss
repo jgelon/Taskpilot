@@ -229,3 +229,24 @@
 
 .claimed-by { color: var(--warning); }
 .assigned-to { color: var(--accent2); }
+
+/* Todoist button */
+.card-todoist { margin-top: 8px; }
+
+.todoist-btn {
+  display: inline-flex; align-items: center; gap: 6px;
+  background: rgba(219,68,55,0.1); border: 1px solid rgba(219,68,55,0.25);
+  color: #db4437; border-radius: 6px; padding: 4px 10px;
+  font-size: 12px; font-weight: 600; cursor: pointer;
+  transition: background 0.15s, border-color 0.15s;
+  &:hover:not(:disabled) { background: rgba(219,68,55,0.18); border-color: rgba(219,68,55,0.4); }
+  &:disabled { opacity: 0.5; cursor: not-allowed; }
+
+  svg { flex-shrink: 0; }
+}
+
+.todoist-spinner {
+  width: 12px; height: 12px;
+  border-color: rgba(219,68,55,0.2);
+  border-top-color: #db4437;
+}

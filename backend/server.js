@@ -482,6 +482,69 @@ app.post('/tasks/import', requireAuth, requireAdmin, (req, res) => {
   res.json({ created, updated, skipped, errors });
 });
 
+// ── User Preferences ──────────────────────────────────────────────────────────
+app.get('/profile/preferences', requireAuth, (req, res) => {
+  const row = db.get('SELECT * FROM user_preferences WHERE username=?', [req.user.username]);
+  res.json({
+    todoistConnected: !!(row?.todoist_token),
+    // Never return the full token — just whether it's set
+  });
+});
+
+app.put('/profile/preferences', requireAuth, (req, res) => {
+  const { todoistToken } = req.body;
+  if (todoistToken === undefined) return res.status(400).json({ error: 'todoistToken required' });
+  db.run(
+    `INSERT OR REPLACE INTO user_preferences (username, todoist_token) VALUES (?,?)`,
+    [req.user.username, todoistToken || null]
+  );
+  res.json({ todoistConnected: !!todoistToken });
+});
+
+// ── Todoist proxy (keeps token server-side) ───────────────────────────────────
+app.post('/todoist/send', requireAuth, async (req, res) => {
+  if (!db.getFeatures().todoist) return res.status(403).json({ error: 'Todoist feature disabled' });
+
+  const prefs = db.get('SELECT todoist_token FROM user_preferences WHERE username=?', [req.user.username]);
+  if (!prefs?.todoist_token) return res.status(400).json({ error: 'No Todoist token configured. Set it in your profile.' });
+
+  const { taskId } = req.body;
+  if (!taskId) return res.status(400).json({ error: 'taskId required' });
+
+  const task = db.get('SELECT * FROM tasks WHERE id=?', [taskId]);
+  if (!task) return res.status(404).json({ error: 'Task not found' });
+
+  // Build Todoist task content
+  const priority = { 1: 4, 2: 3, 3: 2, 4: 1 }[task.priority] || 1; // Todoist: 4=urgent,1=normal
+  const body = {
+    content: task.name,
+    description: task.description || '',
+    priority,
+    ...(task.dueDate ? { due_date: task.dueDate } : {})
+  };
+
+  try {
+    const response = await fetch('https://api.todoist.com/rest/v2/tasks', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${prefs.todoist_token}`,
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify(body)
+    });
+
+    if (response.status === 401) return res.status(401).json({ error: 'Invalid Todoist token. Check your profile settings.' });
+    if (!response.ok) return res.status(502).json({ error: `Todoist API error: ${response.status}` });
+
+    const result = await response.json();
+    console.log(`[Todoist] Sent task "${task.name}" for ${req.user.username}, Todoist id: ${result.id}`);
+    res.json({ success: true, todoistId: result.id, todoistUrl: result.url });
+  } catch (err) {
+    console.error('[Todoist] Fetch failed:', err.message);
+    res.status(502).json({ error: 'Could not reach Todoist API' });
+  }
+});
+
 // ── API Key Management (admin only) ──────────────────────────────────────────
 app.get('/apikeys', requireAuth, requireAdmin, (req, res) => {
   const keys = db.all('SELECT id, name, key_prefix, createdAt, lastUsedAt FROM api_keys ORDER BY createdAt DESC');

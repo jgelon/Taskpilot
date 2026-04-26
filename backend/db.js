@@ -78,6 +78,7 @@ async function init() {
   initSettings();
   initApiKeys();
   initPushSubscriptions();
+  initUserPreferences();
 }
 
 function all(sql, params = []) {
@@ -146,6 +147,7 @@ function initSettings() {
     feature_leaderboard:          process.env.FEATURE_LEADERBOARD          ?? 'true',
     feature_assignment:           process.env.FEATURE_ASSIGNMENT           ?? 'true',
     feature_push_notifications:   process.env.FEATURE_PUSH_NOTIFICATIONS   ?? 'true',
+    feature_todoist:              process.env.FEATURE_TODOIST              ?? 'true',
   };
   for (const [key, value] of Object.entries(defaults)) {
     const existing = get('SELECT value FROM app_settings WHERE key=?', [key]);
@@ -171,6 +173,7 @@ function getFeatures() {
     leaderboard:        getSetting('feature_leaderboard')        !== 'false',
     assignment:         getSetting('feature_assignment')         !== 'false',
     pushNotifications:  getSetting('feature_push_notifications') !== 'false',
+    todoist:            getSetting('feature_todoist')            !== 'false',
   };
 }
 
@@ -183,6 +186,16 @@ function initPushSubscriptions() {
       p256dh TEXT NOT NULL,
       auth TEXT NOT NULL,
       createdAt TEXT NOT NULL
+    )
+  `);
+  save();
+}
+
+function initUserPreferences() {
+  db.run(`
+    CREATE TABLE IF NOT EXISTS user_preferences (
+      username TEXT PRIMARY KEY,
+      todoist_token TEXT
     )
   `);
   save();
@@ -202,5 +215,5 @@ function initApiKeys() {
   save();
 }
 
-module.exports = { init, all, get, run, save, getSetting, setSetting, getFeatures, initApiKeys, initPushSubscriptions };
+module.exports = { init, all, get, run, save, getSetting, setSetting, getFeatures, initApiKeys, initPushSubscriptions, initUserPreferences };
 // (appended — api_keys table)
