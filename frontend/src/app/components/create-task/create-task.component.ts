@@ -22,6 +22,7 @@ export class CreateTaskComponent implements OnInit {
   priority = '2';  // string for select binding
   dueDate = '';
   recurring = 'none';
+  reappearAfterDaysStr = '';
   categoryId = '';  // empty string instead of null for Samsung select compat
   assignedToUsername = '';
   assignedTo: string | null = null;
@@ -65,6 +66,7 @@ export class CreateTaskComponent implements OnInit {
       dueDate: this.dueDate || null,
       recurring: this.recurring,
       recurrenceDays: this.recurring === 'custom' ? days : null,
+      reappearAfterDays: this.recurring === 'soon' && this.reappearAfterDaysStr ? parseInt(this.reappearAfterDaysStr, 10) : null,
       categoryId: this.categoryId || null,
       assignedTo: this.assignedTo,
       assignedToName: this.assignedToName

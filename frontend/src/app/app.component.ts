@@ -131,8 +131,10 @@ export class AppComponent implements OnInit, OnDestroy {
   onTaskClosed(gamResult: any) {
     if (!gamResult) return;
     this.loadStats();
-    if (this.auth.features.points || this.auth.features.achievements) {
-      this.gamToast = { points: gamResult.points, newAchievements: gamResult.newlyEarned || [] };
+    const hasPoints = this.auth.features.points && gamResult.points > 0;
+    const hasAchievements = this.auth.features.achievements && gamResult.newlyEarned?.length > 0;
+    if (hasPoints || hasAchievements) {
+      this.gamToast = { points: gamResult.points || 0, newAchievements: gamResult.newlyEarned || [] };
       setTimeout(() => this.gamToast = null, 4000);
     }
   }

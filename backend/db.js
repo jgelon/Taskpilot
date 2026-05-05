@@ -67,6 +67,8 @@ async function init() {
     'ALTER TABLE tasks ADD COLUMN claimedByName TEXT',
     'ALTER TABLE tasks ADD COLUMN claimedAt TEXT',
     'ALTER TABLE tasks ADD COLUMN assignedTo TEXT',
+    'ALTER TABLE tasks ADD COLUMN reappearAfterDays INTEGER',
+    'ALTER TABLE tasks ADD COLUMN reappearAt TEXT',
     'ALTER TABLE tasks ADD COLUMN assignedToName TEXT',
   ];
   for (const sql of migrations) {

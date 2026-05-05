@@ -146,6 +146,8 @@ function rowToTask(row) {
     claimedAt: row.claimedAt || null,
     assignedTo: row.assignedTo || null,
     assignedToName: row.assignedToName || null,
+    reappearAfterDays: row.reappearAfterDays ? Number(row.reappearAfterDays) : null,
+    reappearAt: row.reappearAt || null,
   };
 }
 
@@ -154,16 +156,21 @@ function scheduleNextRecurrence(task) {
 
   // 'soon' — recreate immediately with no due date
   if (task.recurring === 'soon') {
+    const reappearDays = task.reappearAfterDays || 0;
+    const reappearAt = reappearDays > 0
+      ? new Date(Date.now() + reappearDays * 86400000).toISOString()
+      : null;
     db.run(
       `INSERT INTO tasks (id,name,description,estimatedDuration,priority,dueDate,dateAdded,status,
-        createdBy,createdByName,recurring,recurrenceDays,categoryId,assignedTo,assignedToName)
-       VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
+        createdBy,createdByName,recurring,recurrenceDays,categoryId,assignedTo,assignedToName,reappearAfterDays,reappearAt)
+       VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
       [uuidv4(), task.name, task.description, task.estimatedDuration, task.priority,
        null, new Date().toISOString(), 'open',
        task.createdBy, task.createdByName, task.recurring, null,
-       task.categoryId || null, task.assignedTo || null, task.assignedToName || null]
+       task.categoryId || null, task.assignedTo || null, task.assignedToName || null,
+       reappearHours || null, reappearAt]
     );
-    console.log(`[RECUR] Recreated "${task.name}" immediately (soon)`);
+    console.log(`[RECUR] Recreated "${task.name}" (soon), reappears ${reappearAt || 'immediately'}`);
     return;
   }
   const days = task.recurrenceDays || { daily: 1, weekly: 7, monthly: 30 }[task.recurring] || 7;
@@ -172,8 +179,8 @@ function scheduleNextRecurrence(task) {
   const nextDue = base.toISOString().substring(0, 10);
   db.run(
     `INSERT INTO tasks (id,name,description,estimatedDuration,priority,dueDate,dateAdded,status,
-      createdBy,createdByName,recurring,recurrenceDays,categoryId,assignedTo,assignedToName)
-     VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
+      createdBy,createdByName,recurring,recurrenceDays,categoryId,assignedTo,assignedToName,reappearAfterDays,reappearAt)
+     VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
     [uuidv4(), task.name, task.description, task.estimatedDuration, task.priority,
      nextDue, new Date().toISOString(), 'open',
      task.createdBy, task.createdByName, task.recurring, task.recurrenceDays,
@@ -245,6 +252,11 @@ app.get('/tasks', requireAuth, (req, res) => {
   else if (categoryId) { conditions.push('t.categoryId = ?'); params.push(categoryId); }
 
   const where = conditions.length ? 'WHERE ' + conditions.join(' AND ') : '';
+  // Hide tasks not yet reappeared
+  const nowIso = new Date().toISOString();
+  conditions.push('(t.reappearAt IS NULL OR t.reappearAt <= ?)');
+  params.push(nowIso);
+
   const orderClause = col === 'dueDate'
     ? `ORDER BY CASE WHEN t.dueDate IS NULL THEN 1 ELSE 0 END, t.${col} ${dir}`
     : `ORDER BY t.${col} ${dir}`;
@@ -259,7 +271,7 @@ app.get('/tasks', requireAuth, (req, res) => {
 });
 
 app.post('/tasks', requireAuth, (req, res) => {
-  const { name, description, estimatedDuration, priority, dueDate, recurring, recurrenceDays, categoryId, assignedTo, assignedToName } = req.body;
+  const { name, description, estimatedDuration, priority, dueDate, recurring, recurrenceDays, categoryId, assignedTo, assignedToName, reappearAfterDays } = req.body;
   if (!name || !estimatedDuration || !priority)
     return res.status(400).json({ error: 'name, estimatedDuration, and priority are required' });
   if (priority < 1 || priority > 4)
@@ -267,13 +279,13 @@ app.post('/tasks', requireAuth, (req, res) => {
   const id = uuidv4();
   db.run(
     `INSERT INTO tasks (id,name,description,estimatedDuration,priority,dueDate,dateAdded,status,
-      createdBy,createdByName,recurring,recurrenceDays,categoryId,assignedTo,assignedToName)
-     VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
+      createdBy,createdByName,recurring,recurrenceDays,categoryId,assignedTo,assignedToName,reappearAfterDays,reappearAt)
+     VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
     [id, name, description||'', Number(estimatedDuration), Number(priority),
      dueDate||null, new Date().toISOString(), 'open',
      req.user.username, req.user.name,
      recurring||'none', recurrenceDays||null, categoryId||null,
-     assignedTo||null, assignedToName||null]
+     assignedTo||null, assignedToName||null, reappearAfterDays||null, null]
   );
   const row = db.get(
     `SELECT t.*, c.name as categoryName, c.color as categoryColor
@@ -285,7 +297,7 @@ app.post('/tasks', requireAuth, (req, res) => {
 app.put('/tasks/:id', requireAuth, (req, res) => {
   const existing = db.get('SELECT * FROM tasks WHERE id = ?', [req.params.id]);
   if (!existing) return res.status(404).json({ error: 'Task not found' });
-  const { name, description, estimatedDuration, priority, dueDate, status, recurring, recurrenceDays, categoryId, claim, assignedTo, assignedToName } = req.body;
+  const { name, description, estimatedDuration, priority, dueDate, status, recurring, recurrenceDays, categoryId, claim, assignedTo, assignedToName, reappearAfterDays } = req.body;
   const u = {
     name: name ?? existing.name,
     description: description ?? existing.description,
@@ -300,6 +312,7 @@ app.put('/tasks/:id', requireAuth, (req, res) => {
     claimedBy: existing.claimedBy, claimedByName: existing.claimedByName, claimedAt: existing.claimedAt,
     assignedTo: assignedTo !== undefined ? (assignedTo||null) : existing.assignedTo,
     assignedToName: assignedToName !== undefined ? (assignedToName||null) : existing.assignedToName,
+    reappearAfterDays: reappearAfterDays != null ? Number(reappearAfterDays) : existing.reappearAfterDays,
   };
 
   // Claim task
@@ -324,10 +337,10 @@ app.put('/tasks/:id', requireAuth, (req, res) => {
   db.run(
     `UPDATE tasks SET name=?,description=?,estimatedDuration=?,priority=?,dueDate=?,status=?,
       closedBy=?,closedByName=?,closedAt=?,recurring=?,recurrenceDays=?,categoryId=?,
-      claimedBy=?,claimedByName=?,claimedAt=?,assignedTo=?,assignedToName=? WHERE id=?`,
+      claimedBy=?,claimedByName=?,claimedAt=?,assignedTo=?,assignedToName=?,reappearAfterDays=? WHERE id=?`,
     [u.name,u.description,u.estimatedDuration,u.priority,u.dueDate,u.status,
      u.closedBy,u.closedByName,u.closedAt,u.recurring,u.recurrenceDays,u.categoryId,
-     u.claimedBy,u.claimedByName,u.claimedAt,u.assignedTo,u.assignedToName,req.params.id]
+     u.claimedBy,u.claimedByName,u.claimedAt,u.assignedTo,u.assignedToName,u.reappearAfterDays,req.params.id]
   );
 
   if (status === 'closed' && existing.status !== 'closed') {
@@ -379,13 +392,15 @@ app.post('/tasks/suggest', requireAuth, (req, res) => {
   const { availableMinutes, excludeIds = [] } = req.body;
   if (!availableMinutes || availableMinutes <= 0)
     return res.status(400).json({ error: 'availableMinutes must be positive' });
+  const now_iso = new Date().toISOString();
   const candidates = db.all(
     `SELECT t.*, c.name as categoryName, c.color as categoryColor
      FROM tasks t LEFT JOIN categories c ON t.categoryId = c.id
      WHERE t.status='open' AND t.estimatedDuration <= ?
        AND (t.claimedBy IS NULL OR t.claimedBy = ?)
-       AND (t.assignedTo IS NULL OR t.assignedTo = ?)`,
-    [availableMinutes, req.user.username, req.user.username]
+       AND (t.assignedTo IS NULL OR t.assignedTo = ?)
+       AND (t.reappearAt IS NULL OR t.reappearAt <= ?)`,
+    [availableMinutes, req.user.username, req.user.username, now_iso]
   ).map(rowToTask).filter(t => !excludeIds.includes(t.id));
   if (!candidates.length) return res.json({ task: null });
   const now = new Date();

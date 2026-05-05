@@ -64,6 +64,12 @@
       </select>
     </div>
 
+    <div class="form-group" *ngIf="recurring === 'soon'">
+      <label>Reappear after (days, 0 = immediately)</label>
+      <input type="text" inputmode="numeric" pattern="[0-9]*"
+        [(ngModel)]="reappearAfterDaysStr" name="reappearAfterDays" placeholder="e.g. 3" />
+    </div>
+
     <div class="form-group" *ngIf="recurring === 'custom'">
       <label>Repeat every (days)</label>
       <input type="text" inputmode="numeric" pattern="[0-9]*"

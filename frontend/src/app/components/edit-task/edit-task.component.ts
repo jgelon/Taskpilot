@@ -19,7 +19,7 @@ export class EditTaskComponent implements OnInit {
   name = '';
   description = '';
   estimatedDurationStr = '';
-  recurrenceDaysStr = '';
+  recurrenceDaysStr = ''; reappearAfterDaysStr = '';
   priority = '2';
   dueDate = '';
   status: 'open' | 'closed' = 'open';
@@ -48,6 +48,7 @@ export class EditTaskComponent implements OnInit {
     this.dueDate = this.task.dueDate ? this.task.dueDate.substring(0, 10) : '';
     this.status = this.task.status;
     this.recurring = this.task.recurring || 'none';
+    this.reappearAfterDaysStr = this.task.reappearAfterDays ? String(this.task.reappearAfterDays) : '';
     this.categoryId = this.task.categoryId || '';
     this.assignedTo = this.task.assignedTo;
     this.assignedToName = this.task.assignedToName;
@@ -83,6 +84,7 @@ export class EditTaskComponent implements OnInit {
       status: this.status,
       recurring: this.recurring,
       recurrenceDays: this.recurring === 'custom' ? days : null,
+      reappearAfterDays: this.recurring === 'soon' && this.reappearAfterDaysStr ? parseInt(this.reappearAfterDaysStr, 10) : null,
       categoryId: this.categoryId || null,
       assignedTo: this.assignedTo,
       assignedToName: this.assignedToName

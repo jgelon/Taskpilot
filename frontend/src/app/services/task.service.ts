@@ -34,6 +34,8 @@ export interface Task {
   claimedAt: string | null;
   assignedTo: string | null;
   assignedToName: string | null;
+  reappearAfterDays: number | null;
+  reappearAt: string | null;
 }
 
 export interface TaskStats {
@@ -45,12 +47,14 @@ export interface CreateTaskDto {
   name: string; description?: string; estimatedDuration: number; priority: number;
   dueDate?: string | null; recurring?: string; recurrenceDays?: number | null;
   categoryId?: string | null; assignedTo?: string | null; assignedToName?: string | null;
+  reappearAfterDays?: number | null;
 }
 export interface UpdateTaskDto {
   name?: string; description?: string; estimatedDuration?: number; priority?: number;
   dueDate?: string | null; status?: 'open' | 'closed'; recurring?: string;
   recurrenceDays?: number | null; categoryId?: string | null;
   assignedTo?: string | null; assignedToName?: string | null;
+  reappearAfterDays?: number | null;
 }
 export type SortField = 'dateAdded' | 'priority' | 'dueDate' | 'name' | 'estimatedDuration';
 export type SortOrder = 'asc' | 'desc';

@@ -89,6 +89,7 @@ export class GetTaskComponent implements OnChanges {
       this.taskService.updateTask(this.currentTask.id, { status: 'closed' }).subscribe({
         next: (result: any) => {
           this.loading = false;
+          this.showToast('Task done! 🎉', 'success');
           this.taskClosed.emit(result._gamification || null);
           this.reset();
         },
