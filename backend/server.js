@@ -168,7 +168,7 @@ function scheduleNextRecurrence(task) {
        null, new Date().toISOString(), 'open',
        task.createdBy, task.createdByName, task.recurring, null,
        task.categoryId || null, task.assignedTo || null, task.assignedToName || null,
-       reappearHours || null, reappearAt]
+       reappearAfterDays||null, reappearAt]
     );
     console.log(`[RECUR] Recreated "${task.name}" (soon), reappears ${reappearAt || 'immediately'}`);
     return;
@@ -251,11 +251,11 @@ app.get('/tasks', requireAuth, (req, res) => {
   if (categoryId === 'none') { conditions.push('t.categoryId IS NULL'); }
   else if (categoryId) { conditions.push('t.categoryId = ?'); params.push(categoryId); }
 
-  const where = conditions.length ? 'WHERE ' + conditions.join(' AND ') : '';
-  // Hide tasks not yet reappeared
-  const nowIso = new Date().toISOString();
+  // Hide tasks not yet reappeared (NULL = show immediately)
   conditions.push('(t.reappearAt IS NULL OR t.reappearAt <= ?)');
-  params.push(nowIso);
+  params.push(new Date().toISOString());
+
+  const where = 'WHERE ' + conditions.join(' AND ');
 
   const orderClause = col === 'dueDate'
     ? `ORDER BY CASE WHEN t.dueDate IS NULL THEN 1 ELSE 0 END, t.${col} ${dir}`
