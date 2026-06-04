@@ -69,6 +69,8 @@ async function init() {
     'ALTER TABLE tasks ADD COLUMN assignedTo TEXT',
     'ALTER TABLE tasks ADD COLUMN reappearAfterDays INTEGER',
     'ALTER TABLE tasks ADD COLUMN reappearAt TEXT',
+    'ALTER TABLE push_subscriptions ADD COLUMN lastNotifiedAt TEXT',
+    'ALTER TABLE tasks ADD COLUMN reappearAt TEXT',
     'ALTER TABLE tasks ADD COLUMN assignedToName TEXT',
   ];
   for (const sql of migrations) {
@@ -150,6 +152,8 @@ function initSettings() {
     feature_assignment:           process.env.FEATURE_ASSIGNMENT           ?? 'true',
     feature_push_notifications:   process.env.FEATURE_PUSH_NOTIFICATIONS   ?? 'true',
     feature_todoist:              process.env.FEATURE_TODOIST              ?? 'true',
+    push_cooldown_hours:          process.env.PUSH_COOLDOWN_HOURS          ?? '12',
+    push_cooldown_hours:          process.env.PUSH_COOLDOWN_HOURS          ?? '12',
   };
   for (const [key, value] of Object.entries(defaults)) {
     const existing = get('SELECT value FROM app_settings WHERE key=?', [key]);
@@ -187,9 +191,12 @@ function initPushSubscriptions() {
       endpoint TEXT NOT NULL UNIQUE,
       p256dh TEXT NOT NULL,
       auth TEXT NOT NULL,
-      createdAt TEXT NOT NULL
+      createdAt TEXT NOT NULL,
+      lastNotifiedAt TEXT
     )
   `);
+  // Migration for existing installs
+  try { db.run('ALTER TABLE push_subscriptions ADD COLUMN lastNotifiedAt TEXT'); } catch(_) {}
   save();
 }
 

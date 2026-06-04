@@ -670,34 +670,45 @@ async function sendOverdueNotifications() {
   if (!VAPID_PUBLIC_KEY || !VAPID_PRIVATE_KEY) return;
   if (!db.getFeatures().pushNotifications) return;
 
-  const today = new Date().toISOString().substring(0, 10);
-  const overdueTasks = db.all(
-    `SELECT t.*, u.username as assignedUsername
-     FROM tasks t
-     LEFT JOIN (SELECT DISTINCT username FROM push_subscriptions) u
-       ON t.assignedTo = u.username OR t.assignedTo IS NULL
-     WHERE t.status='open' AND t.dueDate IS NOT NULL AND t.dueDate < ?
-     LIMIT 50`, [today]
-  );
+  const cooldownHours = Number(db.getSetting('push_cooldown_hours') || 12);
+  const cooldownMs = cooldownHours * 3600000;
+  const now = new Date();
+  const today = now.toISOString().substring(0, 10);
 
-  if (overdueTasks.length === 0) return;
-
-  // Group: per-user subscriptions
   const subs = db.all('SELECT * FROM push_subscriptions');
   if (subs.length === 0) return;
 
-  const overdueCounts = {};
-  for (const task of overdueTasks) {
-    // Notify assigned user if set, otherwise all subscribers
-    const targets = task.assignedTo ? [task.assignedTo] : subs.map(s => s.username);
-    for (const u of targets) {
-      overdueCounts[u] = (overdueCounts[u] || 0) + 1;
-    }
+  // Count overdue tasks — exclude tasks not yet reappeared (matches list view)
+  const nowIso = now.toISOString();
+  const allOverdue = db.all(
+    `SELECT assignedTo FROM tasks
+     WHERE status='open' AND dueDate IS NOT NULL AND dueDate < ?
+       AND (reappearAt IS NULL OR reappearAt <= ?)`,
+    [today, nowIso]
+  );
+  if (allOverdue.length === 0) return;
+
+  // Build per-user overdue counts
+  const totalUnassigned = allOverdue.filter(t => !t.assignedTo).length;
+  const assignedCounts = {};
+  for (const t of allOverdue) {
+    if (t.assignedTo) assignedCounts[t.assignedTo] = (assignedCounts[t.assignedTo] || 0) + 1;
   }
 
   for (const sub of subs) {
-    const count = overdueCounts[sub.username];
+    // Cooldown: skip if notified recently
+    if (sub.lastNotifiedAt) {
+      const lastMs = new Date(sub.lastNotifiedAt).getTime();
+      if (now.getTime() - lastMs < cooldownMs) {
+        console.log(`[Push] Skipping ${sub.username} — notified ${Math.round((now - lastMs) / 3600000)}h ago (cooldown: ${cooldownHours}h)`);
+        continue;
+      }
+    }
+
+    // Count: tasks assigned to this user + unassigned tasks
+    const count = (assignedCounts[sub.username] || 0) + totalUnassigned;
     if (!count) continue;
+
     const payload = JSON.stringify({
       title: 'TaskPilot ⚠️',
       body: `You have ${count} overdue task${count > 1 ? 's' : ''}`,
@@ -707,14 +718,18 @@ async function sendOverdueNotifications() {
       renotify: false,
       data: { url: '/' }
     });
+
     try {
       await webpush.sendNotification(
         { endpoint: sub.endpoint, keys: { p256dh: sub.p256dh, auth: sub.auth } },
         payload
       );
+      // Record send time for cooldown
+      db.run('UPDATE push_subscriptions SET lastNotifiedAt=? WHERE id=?',
+        [now.toISOString(), sub.id]);
+      console.log(`[Push] Sent to ${sub.username}: ${count} overdue task(s)`);
     } catch (err) {
       if (err.statusCode === 410 || err.statusCode === 404) {
-        // Subscription expired — remove it
         db.run('DELETE FROM push_subscriptions WHERE endpoint=?', [sub.endpoint]);
         console.log('[Push] Removed expired subscription for', sub.username);
       } else {
@@ -737,17 +752,21 @@ app.get('/gamification/leaderboard', requireAuth, (req, res) => {
 
 // ── App settings routes (admin only) ─────────────────────────────────────────
 app.get('/settings/features', requireAuth, requireAdmin, (req, res) => {
-  res.json(db.getFeatures());
+  const f = db.getFeatures();
+  res.json({ ...f, pushCooldownHours: Number(db.getSetting('push_cooldown_hours') || 12) });
 });
 
 app.put('/settings/features', requireAuth, requireAdmin, (req, res) => {
-  const allowed = ['points', 'streaks', 'achievements', 'leaderboard'];
-  for (const key of allowed) {
-    if (key in req.body) {
-      db.setSetting(`feature_${key}`, req.body[key] ? 'true' : 'false');
-    }
+  const allowed = ['points', 'streaks', 'achievements', 'leaderboard', 'assignment', 'push_notifications', 'todoist'];
+  const flagMap = { points:'feature_points', streaks:'feature_streaks', achievements:'feature_achievements', leaderboard:'feature_leaderboard', assignment:'feature_assignment', pushNotifications:'feature_push_notifications', todoist:'feature_todoist' };
+  for (const [key, dbKey] of Object.entries(flagMap)) {
+    if (key in req.body) db.setSetting(dbKey, req.body[key] ? 'true' : 'false');
   }
-  res.json(db.getFeatures());
+  if (req.body.pushCooldownHours !== undefined) {
+    db.setSetting('push_cooldown_hours', String(Number(req.body.pushCooldownHours) || 12));
+  }
+  const f = db.getFeatures();
+  res.json({ ...f, pushCooldownHours: Number(db.getSetting('push_cooldown_hours') || 12) });
 });
 
 app.get('/health', (req, res) => res.json({ status: 'ok' }));

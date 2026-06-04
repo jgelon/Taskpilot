@@ -116,6 +116,47 @@
       </div>
     </div>
 
+    <!-- Push notification cooldown -->
+    <div class="cooldown-row" *ngIf="features['pushNotifications']">
+      <div class="feature-info">
+        <span class="feature-icon">⏱</span>
+        <div>
+          <div class="feature-label">Notification cooldown</div>
+          <div class="feature-desc">Minimum hours between repeat overdue notifications per user.</div>
+        </div>
+      </div>
+      <div class="cooldown-input">
+        <input type="text" inputmode="numeric" pattern="[0-9]*"
+          [(ngModel)]="pushCooldownHours" name="pushCooldown" class="cooldown-field" />
+        <span class="cooldown-unit">hrs</span>
+        <button class="btn-secondary cooldown-save" (click)="savePushCooldown()" [disabled]="cooldownSaving">
+          {{ cooldownSaving ? '…' : 'Save' }}
+        </button>
+      </div>
+    </div>
+
+    <!-- Push cooldown setting -->
+    <div class="cooldown-row" *ngIf="$any(features)['pushNotifications']">
+      <div class="feature-info">
+        <span class="feature-icon">⏱</span>
+        <div>
+          <div class="feature-label">Notification cooldown</div>
+          <div class="feature-desc">Minimum hours between overdue push notifications per user.</div>
+        </div>
+      </div>
+      <div class="cooldown-input">
+        <select [(ngModel)]="pushCooldownHours" name="pushCooldownHours" class="sort-select">
+          <option value="6">6 hours</option>
+          <option value="12">12 hours</option>
+          <option value="24">24 hours</option>
+          <option value="48">48 hours</option>
+        </select>
+        <button class="btn-secondary" (click)="savePushCooldown()" [disabled]="cooldownSaving">
+          {{ cooldownSaving ? '…' : 'Save' }}
+        </button>
+      </div>
+    </div>
+
     <button class="btn-primary" (click)="saveFeatures()" [disabled]="!featuresChanged || featuresLoading">
       {{ featuresLoading ? 'Saving…' : 'Save Changes' }}
     </button>

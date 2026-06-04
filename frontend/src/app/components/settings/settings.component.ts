@@ -44,6 +44,10 @@ export class SettingsComponent implements OnInit {
   newlyCreatedKey: ApiKeyCreated | null = null;
   confirmDeleteKeyId: string | null = null;
 
+  // Push cooldown
+  pushCooldownHours = 12;
+  cooldownSaving = false;
+
   // Feature flags
   features: Features = { points: true, streaks: true, achievements: true, leaderboard: true, assignment: true, pushNotifications: true, todoist: true };
   featuresLoading = false;
@@ -59,6 +63,7 @@ export class SettingsComponent implements OnInit {
   ngOnInit() {
     this.loadCategories();
     this.loadFeatures();
+    this.loadPushCooldown();
     this.loadApiKeys();
   }
 
@@ -72,6 +77,21 @@ export class SettingsComponent implements OnInit {
   toggleFeature(key: keyof Features) {
     this.features[key] = !this.features[key];
     this.featuresChanged = true;
+  }
+
+  loadPushCooldown() {
+    this.taskService.getPushCooldown().subscribe({
+      next: r => this.pushCooldownHours = r.hours,
+      error: () => {}
+    });
+  }
+
+  savePushCooldown() {
+    this.cooldownSaving = true;
+    this.taskService.savePushCooldown(this.pushCooldownHours).subscribe({
+      next: r => { this.pushCooldownHours = r.hours; this.cooldownSaving = false; this.showToast('Cooldown saved', 'success'); },
+      error: () => { this.cooldownSaving = false; this.showToast('Failed to save', 'error'); }
+    });
   }
 
   saveFeatures() {

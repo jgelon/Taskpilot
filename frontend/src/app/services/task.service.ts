@@ -152,6 +152,23 @@ export class TaskService {
     return this.http.post<any>(`${this.api}/todoist/send`, { taskId }, { headers: this.h() });
   }
 
+  getPushCooldown(): Observable<{hours: number}> {
+    return new Observable(obs => {
+      this.getFeatures().subscribe({
+        next: (f: any) => { obs.next({ hours: f.pushCooldownHours || 12 }); obs.complete(); },
+        error: (e: any) => obs.error(e)
+      });
+    });
+  }
+  savePushCooldown(hours: number): Observable<{hours: number}> {
+    return new Observable(obs => {
+      this.updateFeatures({ pushCooldownHours: hours }).subscribe({
+        next: (f: any) => { obs.next({ hours: f.pushCooldownHours || hours }); obs.complete(); },
+        error: (e: any) => obs.error(e)
+      });
+    });
+  }
+
   getFeatures(): Observable<any> {
     return this.http.get<any>(`${this.api}/settings/features`, { headers: this.h() });
   }

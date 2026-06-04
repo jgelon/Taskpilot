@@ -277,3 +277,14 @@
 .apikey-meta {
   font-size: 11px; color: var(--text-dim);
 }
+
+.cooldown-row {
+  display: flex; align-items: center; justify-content: space-between; gap: 14px;
+  background: var(--surface2); border: 1px solid var(--border);
+  border-radius: var(--radius-sm); padding: 14px;
+  margin-bottom: 4px;
+}
+
+.cooldown-input {
+  display: flex; align-items: center; gap: 8px; flex-shrink: 0;
+}
